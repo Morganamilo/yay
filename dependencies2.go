@@ -42,31 +42,51 @@ func splitDep(dep string) (string, string, string) {
 	return split[0], mod, split[1]
 }
 
-func verSatisfies(ver1, mod, ver2 string) bool {
-	switch mod {
-	case "=":
-		return alpm.VerCmp(ver1, ver2) == 0
-	case "<":
-		return alpm.VerCmp(ver1, ver2) < 0
-	case "<=":
-		return alpm.VerCmp(ver1, ver2) <= 0
-	case ">":
-		return alpm.VerCmp(ver1, ver2) > 0
-	case ">=":
-		return alpm.VerCmp(ver1, ver2) >= 0
+
+
+type target struct {
+	Db string
+	Name string
+	Mod string
+	Version string
+}
+
+func toTarget(pkg string) target {
+	db, dep := splitDbFromName(pkg)
+	name, mod, version := splitDep(dep)
+
+	return target {
+		db,
+		name,
+		mod,
+		version,
+	}
+}
+
+func (t target) DepString() string {
+	return t.Name + t.Mod + t.Version
+}
+
+func (t target) String() string {
+	str := ""
+
+	if t.Db != "" {
+		str += t.Db + "/"
 	}
 
-	return true
+	return str + t.DepString()
 }
 
 type dependencyTree struct {
-	targets []string
+	Targets []target
 	Queue []string
 	Repo     []*alpm.Package
 	Aur      []*rpc.Pkg
+	AurCache      []*rpc.Pkg
 	Groups    []string
-	LocalDB *alpm.Db
-	RemoteDB alpm.DbList
+	Missing    []string
+	LocalDb *alpm.Db
+	SyncDb alpm.DbList
 	Warnings *aurWarnings
 }
 
@@ -81,10 +101,12 @@ func makeDependencyTree() (*dependencyTree, error) {
 	}
 
 	dt := &dependencyTree {
-		make([]string, 0),
+		make([]target, 0),
 		make([]string, 0),
 		make([]*alpm.Package, 0),
 		make([]*rpc.Pkg, 0),
+		make([]*rpc.Pkg, 0),
+		make([]string, 0),
 		make([]string, 0),
 		localDb,
 		syncDb,
@@ -92,6 +114,32 @@ func makeDependencyTree() (*dependencyTree, error) {
 	}
 
 	return dt, nil
+}
+
+func (dt *dependencyTree) String() string {
+	str := ""
+	str += "\nRepo:"
+	for _, pkg := range dt.Repo {
+		str += " " + pkg.Name()
+	}
+
+	str += "\nAur:"
+	for _, pkg := range dt.Aur {
+		str += " " + pkg.Name
+	}
+
+	str += "\nGroups:"
+	for _, pkg := range dt.Groups {
+		str += " " + pkg
+	}
+
+
+	str += "\nMissing:"
+	for _, pkg := range dt.Missing {
+		str += " " + pkg
+	}
+
+	return str
 }
 
 
@@ -121,68 +169,156 @@ func provideSatisfies(provide, dep string) bool {
 	return verSatisfies(provideVersion, depMod, depVersion)
 }
 
+// Includes db/ prefixes and group installs
+func (dt *dependencyTree) ResolveTargets() error {
+	aurTargets := make([]target, 0)
 
-func (dt *dependencyTree) resolveNeeded(pkgs string) (*dependencyTree, error) {
-return nil, nil
-}
+	for _, target := range dt.Targets {
 
-func (dt *dependencyTree) resolveTargets(targets string) error {
-	aurPkgs := make(stringSet)
-
-	for _, pkg := range targets {
-		db, name := splitDbFromName(pkg)
-		var foundPkg *alpm.Package
-		var singleDb *alpm.Db
-
-		if db == "aur" {
-			aurPkgs.set(name)
+		// skip targets already satisfied
+		// even if the user enters db/pkg and aur/pkg the latter will
+		// still get skipt even if it's from a different database to
+		// the one specified
+		// this is how pacman behaves
+		if dt.hasSatisfier(target.DepString()) {
+			fmt.Println("Skipping target", target)
 			continue
 		}
 
-		// Check the repos for a matching dep
-		if db != "" {
-			singleDb, err = alpmHandle.SyncDbByName(db)
+		var foundPkg *alpm.Package
+		var singleDb *alpm.Db
+		var err error
+
+		// aur/ prefix means we only check the aur
+		if target.Db == "aur" {
+			aurTargets = append(aurTargets, target)
+			continue
+		}
+
+		// if theres a different prfix only look in that repo
+		if target.Db != "" {
+			singleDb, err = alpmHandle.SyncDbByName(target.Db)
 			if err != nil {
-				return dt, err
+				return err
 			}
-			foundPkg, err = singleDb.PkgCache().FindSatisfier(name)
+			foundPkg, err = singleDb.PkgCache().FindSatisfier(target.Name)
+		//otherwise find it in any repo
 		} else {
-			foundPkg, err = syncDb.FindSatisfier(name)
+			foundPkg, err = dt.SyncDb.FindSatisfier(target.Name)
 		}
 
 		if err == nil {
+			dt.Repo = append(dt.Repo, foundPkg)
 			//repoTreeRecursive(foundPkg, dt, localDb, syncDb)
 			continue
 		} else {
+			//check for groups
+			//currently we dont resolve the packages in a group
+			//only check if the group exists
 			//would be better to check the groups from singleDb if
 			//the user specified a db but theres no easy way to do
 			//it without making alpm_lists so dont bother for now
 			//db/group is probably a rare use case
-			_, err := syncDb.PkgCachebyGroup(name)
+			_, err := dt.SyncDb.PkgCachebyGroup(target.Name)
 
 			if err == nil {
-				dt.Groups = append(dt.Groups, pkg)
+				dt.Groups = append(dt.Groups, target.String())
 				continue
 			}
 		}
 
-		if db == "" {
-			dt.ToProcess.set(name)
-		} else {
-			dt.Missing.set(pkg)
+		//if there was no db prefix check the aur
+		if target.Db == "" {
+			aurTargets = append(aurTargets, target)
 		}
+	}
+
+	if len(aurTargets) == 0 {
+		return nil
+	}
+
+	names := make(stringSet)
+	for _, target := range aurTargets {
+		names.set(target.Name)
+	}
+
+	info, err := aurInfo(names.toSlice(), dt.Warnings)
+	if err != nil {
+		return err
+	}
+
+	// Dump everything in cache just in case we need it later
+	for _, pkg := range info {
+		dt.AurCache = append(dt.AurCache, pkg)
+	}
+
+	outer:
+	for _, target := range dt.Targets {
+		//first pass just look for a matching name
+		for _, pkg := range dt.AurCache {
+			if pkgSatisfies(pkg.Name, pkg.Version, target.DepString()) {
+				dt.Aur = append(dt.Aur, pkg)
+				continue outer
+			}
+		}
+
+		satisfiers := make([]*rpc.Pkg, 0)
+
+		//look for provides then
+		for _, pkg := range dt.AurCache {
+			for _, provide := range pkg.Provides {
+				if provideSatisfies(provide, target.DepString()) {
+					satisfiers = append(satisfiers, pkg)
+					continue outer
+				}
+			}
+		}
+
+		// didnt find a satisfier, how sad
+		if len(satisfiers) == 0 {
+			continue
+		}
+
+		//TODO add a menu
+		dt.Aur = append(dt.Aur, satisfiers[0])
+	}
+
+
+	return nil
+}
+
+
+func (dt *dependencyTree) ResolveDependencies(pkgs string) error {
+	return nil
+}
+
+// Resolves the targets specified by the user
+
+
+func (dt *dependencyTree) queryAUR(pkgs []string) error {
+	_, err := aurInfo(pkgs, dt.Warnings)
+	if err != nil {
+		return err
+	}
+
+	return nil
 
 }
 
-func (dt *dependencyTree) getDependencyTree(pkgs []string) (*dependencyTree, error) {
+func getDependencyTree() (*dependencyTree, error) {
 	dt, err := makeDependencyTree()
 	if err != nil {
 		return nil, err
 	}
 
-	dt.ResolveTargets()
+	return dt, err
+}
 
-	return nil, nil
+func (dt *dependencyTree) ParseTargets(pkgs []string) {
+	for _, pkg := range pkgs {
+		target := toTarget(pkg)
+		dt.Targets = append(dt.Targets, target)
+	}
 }
 
 func (dt *dependencyTree) queueNeeded(pkg string) {
@@ -229,4 +365,27 @@ func (dt *dependencyTree) findSatisfierRepo(dep string) *alpm.Package {
 
 func (dt *dependencyTree) hasSatisfier(dep string) bool {
 	return dt.findSatisfierRepo(dep) != nil || dt.findSatisfierAur(dep) != nil
+}
+
+func (dt *dependencyTree) hasPackage(name string) bool {
+	for _, pkg := range dt.Repo {
+		if pkg.Name() == name {
+			return true
+		}
+	}
+
+	for _, pkg := range dt.Aur {
+		if pkg.Name == name {
+			return true
+		}
+	}
+
+	for _, pkg := range dt.Groups {
+		if pkg == name {
+			return true
+		}
+	}
+
+
+	return false
 }

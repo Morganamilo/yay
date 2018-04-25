@@ -40,3 +40,20 @@ func ParseDepMod(mod string) alpm.DepMod {
 
 	return alpm.DepModAny
 }
+
+func verSatisfies(ver1, mod, ver2 string) bool {
+	switch mod {
+	case "=":
+		return alpm.VerCmp(ver1, ver2) == 0
+	case "<":
+		return alpm.VerCmp(ver1, ver2) < 0
+	case "<=":
+		return alpm.VerCmp(ver1, ver2) <= 0
+	case ">":
+		return alpm.VerCmp(ver1, ver2) > 0
+	case ">=":
+		return alpm.VerCmp(ver1, ver2) >= 0
+	}
+
+	return true
+}

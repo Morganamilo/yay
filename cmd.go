@@ -305,6 +305,11 @@ func handleConfig(option, value string) bool {
 
 func handleVersion() {
 	fmt.Printf("yay v%s\n", version)
+
+	dt, err := getDependencyTree()
+	dt.ParseTargets(cmdArgs.targets.toSlice())
+	dt.ResolveTargets()
+	fmt.Println(dt, "\nError:", err)
 }
 
 func handlePrint() (err error) {
