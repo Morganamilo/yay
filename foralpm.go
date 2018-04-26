@@ -8,9 +8,9 @@ func ParseDepend(dep string) alpm.Depend {
 	name, mod, version := splitDep(dep)
 
 	return alpm.Depend{
-		Name: name,
+		Name:    name,
 		Version: version,
-		Mod: ParseDepMod(mod),
+		Mod:     ParseDepMod(mod),
 	}
 }
 

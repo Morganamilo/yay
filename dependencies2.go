@@ -6,7 +6,7 @@ import (
 
 	alpm "github.com/jguer/go-alpm"
 	rpc "github.com/mikkeloscar/aur"
-//	gopkg "github.com/mikkeloscar/gopkgbuild"
+	//	gopkg "github.com/mikkeloscar/gopkgbuild"
 )
 
 type source int
@@ -42,12 +42,10 @@ func splitDep(dep string) (string, string, string) {
 	return split[0], mod, split[1]
 }
 
-
-
 type target struct {
-	Db string
-	Name string
-	Mod string
+	Db      string
+	Name    string
+	Mod     string
 	Version string
 }
 
@@ -55,7 +53,7 @@ func toTarget(pkg string) target {
 	db, dep := splitDbFromName(pkg)
 	name, mod, version := splitDep(dep)
 
-	return target {
+	return target{
 		db,
 		name,
 		mod,
@@ -68,25 +66,23 @@ func (t target) DepString() string {
 }
 
 func (t target) String() string {
-	str := ""
-
 	if t.Db != "" {
-		str += t.Db + "/"
+		return t.Db + "/" + t.DepString()
 	}
 
-	return str + t.DepString()
+	return t.DepString()
 }
 
 type dependencyTree struct {
-	Targets []target
-	Queue []string
+	Targets  []target
+	Queue    []string
 	Repo     []*alpm.Package
 	Aur      []*rpc.Pkg
-	AurCache      []*rpc.Pkg
-	Groups    []string
-	Missing    []string
-	LocalDb *alpm.Db
-	SyncDb alpm.DbList
+	AurCache []*rpc.Pkg
+	Groups   []string
+	Missing  []string
+	LocalDb  *alpm.Db
+	SyncDb   alpm.DbList
 	Warnings *aurWarnings
 }
 
@@ -100,7 +96,7 @@ func makeDependencyTree() (*dependencyTree, error) {
 		return nil, err
 	}
 
-	dt := &dependencyTree {
+	dt := &dependencyTree{
 		make([]target, 0),
 		make([]string, 0),
 		make([]*alpm.Package, 0),
@@ -133,7 +129,6 @@ func (dt *dependencyTree) String() string {
 		str += " " + pkg
 	}
 
-
 	str += "\nMissing:"
 	for _, pkg := range dt.Missing {
 		str += " " + pkg
@@ -141,7 +136,6 @@ func (dt *dependencyTree) String() string {
 
 	return str
 }
-
 
 func pkgSatisfies(name, version, dep string) bool {
 	depName, depMod, depVersion := splitDep(dep)
@@ -202,7 +196,7 @@ func (dt *dependencyTree) ResolveTargets() error {
 				return err
 			}
 			foundPkg, err = singleDb.PkgCache().FindSatisfier(target.Name)
-		//otherwise find it in any repo
+			//otherwise find it in any repo
 		} else {
 			foundPkg, err = dt.SyncDb.FindSatisfier(target.Name)
 		}
@@ -252,7 +246,7 @@ func (dt *dependencyTree) ResolveTargets() error {
 		dt.AurCache = append(dt.AurCache, pkg)
 	}
 
-	outer:
+outer:
 	for _, target := range dt.Targets {
 		//first pass just look for a matching name
 		for _, pkg := range dt.AurCache {
@@ -283,17 +277,14 @@ func (dt *dependencyTree) ResolveTargets() error {
 		dt.Aur = append(dt.Aur, satisfiers[0])
 	}
 
-
 	return nil
 }
 
-
-func (dt *dependencyTree) ResolveDependencies(pkgs string) error {
+func (dt *dependencyTree) ResolveRepoDependencies(pkgs string) error {
 	return nil
 }
 
 // Resolves the targets specified by the user
-
 
 func (dt *dependencyTree) queryAUR(pkgs []string) error {
 	_, err := aurInfo(pkgs, dt.Warnings)
@@ -349,7 +340,7 @@ func (dt *dependencyTree) findSatisfierRepo(dep string) *alpm.Package {
 			return pkg
 		}
 
-		if pkg.Provides().ForEach(func(provide alpm.Depend) error  {
+		if pkg.Provides().ForEach(func(provide alpm.Depend) error {
 			if provideSatisfies(provide.String(), dep) {
 				return fmt.Errorf("")
 			}
@@ -385,7 +376,6 @@ func (dt *dependencyTree) hasPackage(name string) bool {
 			return true
 		}
 	}
-
 
 	return false
 }
