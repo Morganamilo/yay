@@ -149,7 +149,7 @@ func pkgSatisfies(name, version, dep string) bool {
 
 func provideSatisfies(provide, dep string) bool {
 	depName, depMod, depVersion := splitDep(dep)
-	provideName, provideMod, provideVersion := splitDep(dep)
+	provideName, provideMod, provideVersion := splitDep(provide)
 
 	if provideName != depName {
 		return false
@@ -166,12 +166,13 @@ func provideSatisfies(provide, dep string) bool {
 // Includes db/ prefixes and group installs
 func (dt *dependencyTree) ResolveTargets() error {
 	aurTargets := make([]target, 0)
+	//repo := make([]*alpm.Package, 0)
 
 	for _, target := range dt.Targets {
 
 		// skip targets already satisfied
 		// even if the user enters db/pkg and aur/pkg the latter will
-		// still get skipt even if it's from a different database to
+		// still get skiped even if it's from a different database to
 		// the one specified
 		// this is how pacman behaves
 		if dt.hasSatisfier(target.DepString()) {
@@ -189,7 +190,7 @@ func (dt *dependencyTree) ResolveTargets() error {
 			continue
 		}
 
-		// if theres a different prfix only look in that repo
+		// if theres a different priefix only look in that repo
 		if target.Db != "" {
 			singleDb, err = alpmHandle.SyncDbByName(target.Db)
 			if err != nil {
@@ -203,6 +204,7 @@ func (dt *dependencyTree) ResolveTargets() error {
 
 		if err == nil {
 			dt.Repo = append(dt.Repo, foundPkg)
+			dt.ResolveRepoDependency(foundPkg)
 			//repoTreeRecursive(foundPkg, dt, localDb, syncDb)
 			continue
 		} else {
@@ -227,10 +229,15 @@ func (dt *dependencyTree) ResolveTargets() error {
 		}
 	}
 
-	if len(aurTargets) == 0 {
-		return nil
+
+	if len(aurTargets) > 0 {
+		err = resolveAURTargets(aurTargets)
 	}
 
+	return nil
+}
+
+func (dt *dependencyTree) resolveAURPackages(pkgs []string) {
 	names := make(stringSet)
 	for _, target := range aurTargets {
 		names.set(target.Name)
@@ -277,12 +284,48 @@ outer:
 		dt.Aur = append(dt.Aur, satisfiers[0])
 	}
 
-	return nil
 }
 
-func (dt *dependencyTree) ResolveRepoDependencies(pkgs string) error {
-	return nil
+func (dt *dependencyTree) ResolveRepoDependency(pkg *alpm.Package) {
+	pkg.Depends().ForEach(func(dep alpm.Depend) (err error) {
+		//have satisfier in dep tree: skip
+		if dt.hasSatisfier(dep.String()) {
+			fmt.Println("In tree:", dep)
+			return
+		}
+		
+		//has satisfier installed: skip
+		_, isInstalled := dt.LocalDb.PkgCache().FindSatisfier(dep.String())
+		if isInstalled == nil {
+			fmt.Println("Installed:", dep)
+			return
+		}
+
+		//has satisfier in repo: fetch it
+		repoPkg, inRepos := dt.SyncDb.FindSatisfier(dep.String())
+		if inRepos != nil {
+			fmt.Println("Missing:", dep)
+			return
+		}
+		fmt.Println("Found:", dep)
+
+		dt.Repo = append(dt.Repo, repoPkg)
+		dt.ResolveRepoDependency(repoPkg)
+
+		return nil
+	})
+
 }
+
+/*func (dt *dependencyTree) resolveRepoDependency(dep string) {
+	fmt.Printf("%-30s","Resolving: "+ dep+"...  ")
+
+
+	repoPkg.Depends().ForEach(func(dep alpm.Depend) (err error) {
+		dt.resolveRepoDependency(dep.String())
+		return nil
+	})
+}*/
 
 // Resolves the targets specified by the user
 
@@ -355,6 +398,10 @@ func (dt *dependencyTree) findSatisfierRepo(dep string) *alpm.Package {
 }
 
 func (dt *dependencyTree) hasSatisfier(dep string) bool {
+	if a := dt.findSatisfierRepo(dep); a != nil {
+		fmt.Println(dep, "satisfied by", a.Name())
+	}
+
 	return dt.findSatisfierRepo(dep) != nil || dt.findSatisfierAur(dep) != nil
 }
 
