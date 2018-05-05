@@ -306,12 +306,10 @@ func handleConfig(option, value string) bool {
 func handleVersion() {
 	fmt.Printf("yay v%s\n", version)
 
-	dt, err := getDependencyTree()
-	err = dt.ResolveTargets(cmdArgs.targets.toSlice())
-
-	fmt.Println(dt, "\nError:", err)
-	do, err := getDepOrder(dt)
-	fmt.Println(do, "\nError:", err)
+	dp, err := getDepPool(cmdArgs.targets.toSlice())
+	fmt.Println(dp, "\nError:", err)
+	do := getDepOrder(dp)
+	fmt.Println(do)
 }
 
 func handlePrint() (err error) {

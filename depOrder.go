@@ -12,43 +12,43 @@ import (
 )
 
 type depOrder struct {
-	Aur      []*rpc.Pkg
-	Repo     []*alpm.Package
-	Missing  []string
+	Aur     []*rpc.Pkg
+	Repo    []*alpm.Package
+	Missing []string
 	Runtime stringSet
 }
 
 func (do *depOrder) String() string {
 	str := ""
 	str += "\n" + red("Repo") + " (" + strconv.Itoa(len(do.Repo)) + ") :"
-	for _,pkg := range do.Repo {
-		str += " " + pkg.Name()
+	for _, pkg := range do.Repo {
+		if do.Runtime.get(pkg.Name()) {
+			str += " " + pkg.Name()
+		}
 	}
 
 	str += "\n" + red("Aur") + " (" + strconv.Itoa(len(do.Aur)) + ") :"
-	for _,pkg := range do.Aur {
-		str += " " + pkg.Name
+	for _, pkg := range do.Aur {
+		if do.Runtime.get(pkg.Name) {
+			str += " " + pkg.Name
+		}
+
 	}
 
-	str += "\n" + red("Runtime") + " (" + strconv.Itoa(len(do.Runtime)) + ") :"
-	for pkg := range do.Runtime {
-		str += " " + pkg
-	}
-
-	str += "\n" + red("Make") + " (" + strconv.Itoa(len(do.Repo) + len(do.Aur) - len(do.Runtime)) + ") :"
-	for _,pkg := range do.Repo {
+	str += "\n" + red("Repo Make") + " (" + strconv.Itoa(len(do.Repo)) + ") :"
+	for _, pkg := range do.Repo {
 		if !do.Runtime.get(pkg.Name()) {
-		str += " " + pkg.Name()
+			str += " " + pkg.Name()
 		}
 	}
-	for _,pkg := range do.Aur {
+
+	str += "\n" + red("Aur Make") + " (" + strconv.Itoa(len(do.Aur)) + ") :"
+	for _, pkg := range do.Aur {
 		if !do.Runtime.get(pkg.Name) {
-		str += " " + pkg.Name
+			str += " " + pkg.Name
 		}
+
 	}
-
-
-
 
 	return str
 }
@@ -62,23 +62,23 @@ func makeDepOrder() *depOrder {
 	}
 }
 
-func getDepOrder(dp *depPool) (*depOrder, error) {
+func getDepOrder(dp *depPool) *depOrder {
 	do := makeDepOrder()
 
 	for _, target := range dp.Targets {
-			dep := target.DepString()
-			aurPkg := dp.findSatisfierAur(dep)
-			if aurPkg != nil {
-				do.orderPkgAur(aurPkg, dp, true)
-			}
-			
-			repoPkg := dp.findSatisfierRepo(dep)
-			if repoPkg != nil {
-				do.orderPkgRepo(repoPkg, dp, true)
-			}
+		dep := target.DepString()
+		aurPkg := dp.findSatisfierAur(dep)
+		if aurPkg != nil {
+			do.orderPkgAur(aurPkg, dp, true)
+		}
+
+		repoPkg := dp.findSatisfierRepo(dep)
+		if repoPkg != nil {
+			do.orderPkgRepo(repoPkg, dp, true)
+		}
 	}
 
-	return do, nil
+	return do
 }
 
 func (do *depOrder) orderPkgAur(pkg *rpc.Pkg, dp *depPool, runtime bool) {
@@ -88,14 +88,13 @@ func (do *depOrder) orderPkgAur(pkg *rpc.Pkg, dp *depPool, runtime bool) {
 	do.Aur = append(do.Aur, pkg)
 	delete(dp.Aur, pkg.Name)
 
-
 	for _, deps := range [3][]string{pkg.Depends, pkg.MakeDepends, pkg.CheckDepends} {
 		for _, dep := range deps {
 			aurPkg := dp.findSatisfierAur(dep)
 			if aurPkg != nil {
 				do.orderPkgAur(aurPkg, dp, runtime)
 			}
-			
+
 			repoPkg := dp.findSatisfierRepo(dep)
 			if repoPkg != nil {
 				do.orderPkgRepo(repoPkg, dp, runtime)
@@ -104,7 +103,6 @@ func (do *depOrder) orderPkgAur(pkg *rpc.Pkg, dp *depPool, runtime bool) {
 			runtime = false
 		}
 	}
-
 }
 
 func (do *depOrder) orderPkgRepo(pkg *alpm.Package, dp *depPool, runtime bool) {
@@ -119,7 +117,31 @@ func (do *depOrder) orderPkgRepo(pkg *alpm.Package, dp *depPool, runtime bool) {
 		if repoPkg != nil {
 			do.orderPkgRepo(repoPkg, dp, runtime)
 		}
-		
+
 		return nil
 	})
+}
+
+func (do *depOrder) getMakeOnlyRepo() stringSet {
+	makeOnly := make(stringSet)
+
+	for _, pkg := range do.Repo {
+		if !do.Runtime.get(pkg.Name()) {
+			makeOnly.set(pkg.Name())
+		}
+	}
+
+	return makeOnly
+}
+
+func (do *depOrder) getMakeOnlyAur() stringSet {
+	makeOnly := make(stringSet)
+
+	for _, pkg := range do.Aur {
+		if !do.Runtime.get(pkg.Name) {
+			makeOnly.set(pkg.Name)
+		}
+	}
+
+	return makeOnly
 }

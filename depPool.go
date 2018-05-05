@@ -86,7 +86,7 @@ type depPool struct {
 	Warnings *aurWarnings
 }
 
-func makeDependencyTree() (*depPool, error) {
+func makeDepPool() (*depPool, error) {
 	localDb, err := alpmHandle.LocalDb()
 	if err != nil {
 		return nil, err
@@ -214,9 +214,7 @@ func (dp *depPool) ResolveTargets(pkgs []string) error {
 		}
 
 		if err == nil {
-			//dp.Repo = append(dp.Repo, foundPkg)
 			dp.ResolveRepoDependency(foundPkg)
-			//repoTreeRecursive(foundPkg, dp, localDb, syncDb)
 			continue
 		} else {
 			//check for groups
@@ -310,7 +308,7 @@ func (dp *depPool) cacheAURPackages(_pkgs stringSet) error {
 	//TODO: config option, maybe --deepsearh but aurman uses that flag for
 	//something else already which might be confusing
 	//maybe --provides
-	if false {
+	if true {
 		err := dp.superFetch(pkgs)
 		if err != nil {
 			return err
@@ -436,11 +434,13 @@ func (dp *depPool) queryAUR(pkgs []string) error {
 	return nil
 }
 
-func getDependencyTree() (*depPool, error) {
-	dp, err := makeDependencyTree()
+func getDepPool(pkgs []string) (*depPool, error) {
+	dp, err := makeDepPool()
 	if err != nil {
 		return nil, err
 	}
+
+	err = dp.ResolveTargets(pkgs)
 
 	return dp, err
 }
@@ -536,4 +536,3 @@ func (dp *depPool) hasPackage(name string) bool {
 
 	return false
 }
-

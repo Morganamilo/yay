@@ -575,7 +575,7 @@ func providerMenu(dep string, providers []*rpc.Pkg) *rpc.Pkg {
 		}
 
 		if string(numberBuf) == "" {
-			break
+			return providers[0]
 		}
 
 		num, err := strconv.Atoi(string(numberBuf))
