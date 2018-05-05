@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/xml"
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"bufio"
 
 	rpc "github.com/mikkeloscar/aur"
 )
@@ -589,7 +589,7 @@ func providerMenu(dep string, providers []*rpc.Pkg) *rpc.Pkg {
 			continue
 		}
 
-		return providers[num - 1]
+		return providers[num-1]
 	}
 
 	return nil
