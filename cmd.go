@@ -307,9 +307,11 @@ func handleVersion() {
 	fmt.Printf("yay v%s\n", version)
 
 	dt, err := getDependencyTree()
-	dt.ParseTargets(cmdArgs.targets.toSlice())
-	dt.ResolveTargets()
+	err = dt.ResolveTargets(cmdArgs.targets.toSlice())
+
 	fmt.Println(dt, "\nError:", err)
+	do, err := getDepOrder(dt)
+	fmt.Println(do, "\nError:", err)
 }
 
 func handlePrint() (err error) {

@@ -112,6 +112,11 @@ func makeDependencyTree() (*depPool, error) {
 
 func (dp *depPool) String() string {
 	str := ""
+	str += "\n" + red("Targets") + " (" + strconv.Itoa(len(dp.Targets)) + ") :"
+	for _, pkg := range dp.Targets {
+		str += " " + pkg.String()
+	}
+
 	str += "\n" + red("Repo") + " (" + strconv.Itoa(len(dp.Repo)) + ") :"
 	for pkg := range dp.Repo {
 		str += " " + pkg
@@ -162,7 +167,12 @@ func provideSatisfies(provide, dep string) bool {
 }
 
 // Includes db/ prefixes and group installs
-func (dp *depPool) ResolveTargets() error {
+func (dp *depPool) ResolveTargets(pkgs []string) error {
+	for _, pkg := range pkgs {
+		target := toTarget(pkg)
+		dp.Targets = append(dp.Targets, target)
+	}
+
 	// RPC requests are slow
 	// Combine as many AUR package requests as possible into a single RPC
 	// call
@@ -300,7 +310,7 @@ func (dp *depPool) cacheAURPackages(_pkgs stringSet) error {
 	//TODO: config option, maybe --deepsearh but aurman uses that flag for
 	//something else already which might be confusing
 	//maybe --provides
-	if true {
+	if false {
 		err := dp.superFetch(pkgs)
 		if err != nil {
 			return err
@@ -435,13 +445,6 @@ func getDependencyTree() (*depPool, error) {
 	return dp, err
 }
 
-func (dp *depPool) ParseTargets(pkgs []string) {
-	for _, pkg := range pkgs {
-		target := toTarget(pkg)
-		dp.Targets = append(dp.Targets, target)
-	}
-}
-
 func (dp *depPool) findSatisfierAur(dep string) *rpc.Pkg {
 	for _, pkg := range dp.Aur {
 		if pkgSatisfies(pkg.Name, pkg.Version, dep) {
@@ -533,3 +536,4 @@ func (dp *depPool) hasPackage(name string) bool {
 
 	return false
 }
+

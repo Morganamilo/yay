@@ -2,7 +2,7 @@ package main
 
 import (
 	//	"fmt"
-	//	"strconv"
+	"strconv"
 	//	"strings"
 	//	"sync"
 
@@ -13,9 +13,44 @@ import (
 
 type depOrder struct {
 	Aur      []*rpc.Pkg
-	repo     []*alpm.Package
+	Repo     []*alpm.Package
 	Missing  []string
-	MakeOnly stringSet
+	Runtime stringSet
+}
+
+func (do *depOrder) String() string {
+	str := ""
+	str += "\n" + red("Repo") + " (" + strconv.Itoa(len(do.Repo)) + ") :"
+	for _,pkg := range do.Repo {
+		str += " " + pkg.Name()
+	}
+
+	str += "\n" + red("Aur") + " (" + strconv.Itoa(len(do.Aur)) + ") :"
+	for _,pkg := range do.Aur {
+		str += " " + pkg.Name
+	}
+
+	str += "\n" + red("Runtime") + " (" + strconv.Itoa(len(do.Runtime)) + ") :"
+	for pkg := range do.Runtime {
+		str += " " + pkg
+	}
+
+	str += "\n" + red("Make") + " (" + strconv.Itoa(len(do.Repo) + len(do.Aur) - len(do.Runtime)) + ") :"
+	for _,pkg := range do.Repo {
+		if !do.Runtime.get(pkg.Name()) {
+		str += " " + pkg.Name()
+		}
+	}
+	for _,pkg := range do.Aur {
+		if !do.Runtime.get(pkg.Name) {
+		str += " " + pkg.Name
+		}
+	}
+
+
+
+
+	return str
 }
 
 func makeDepOrder() *depOrder {
@@ -27,53 +62,64 @@ func makeDepOrder() *depOrder {
 	}
 }
 
-func orderPkgs(dp *depPool) {
+func getDepOrder(dp *depPool) (*depOrder, error) {
 	do := makeDepOrder()
 
-	for _, pkg := range dp.Repo {
-		do.orderRepoPkg(pkg, dp)
+	for _, target := range dp.Targets {
+			dep := target.DepString()
+			aurPkg := dp.findSatisfierAur(dep)
+			if aurPkg != nil {
+				do.orderPkgAur(aurPkg, dp, true)
+			}
+			
+			repoPkg := dp.findSatisfierRepo(dep)
+			if repoPkg != nil {
+				do.orderPkgRepo(repoPkg, dp, true)
+			}
 	}
 
+	return do, nil
 }
 
-/*func (dp *depOrder) orderPkg(pkg string, dp *depPool) {
-	aurPkg = dp.findSatisfierAur(pkg)
-	if aurPkg != nil {
-		delete(dp.Aur, aurPkg.Name)
-		do.Aur = append(do.Aur, aurPkg)
+func (do *depOrder) orderPkgAur(pkg *rpc.Pkg, dp *depPool, runtime bool) {
+	if runtime {
+		do.Runtime.set(pkg.Name)
 	}
+	do.Aur = append(do.Aur, pkg)
+	delete(dp.Aur, pkg.Name)
 
-	repoPkg = dp.findSatisfierRepo(pkg)
-	if repoPkg != nil {
-		delete(dp.Repo, repoPkg)
-		do.Repo = append(do.Repo, repoPkg)
-	}
 
-}
-
-func (do *depOrder) orderAurPkg(pkg *rpc.Pkg, dp *depPool) {
 	for _, deps := range [3][]string{pkg.Depends, pkg.MakeDepends, pkg.CheckDepends} {
-		for _, pkg := range deps {
-			orderAurPkg(pkg, dp)
+		for _, dep := range deps {
+			aurPkg := dp.findSatisfierAur(dep)
+			if aurPkg != nil {
+				do.orderPkgAur(aurPkg, dp, runtime)
+			}
+			
+			repoPkg := dp.findSatisfierRepo(dep)
+			if repoPkg != nil {
+				do.orderPkgRepo(repoPkg, dp, runtime)
+			}
+
+			runtime = false
 		}
 	}
 
-	orderPkg()
+}
 
-}*/
-
-func (do *depOrder) orderRepoPkg(pkg *alpm.Package, dp *depPool) {
-	pkg.Depends().ForEach(func(dep alpm.Depend) (err error) {
-		pkg := dp.findSatisfierRepo(dep.String())
-		if pkg == nil {
-			return nil
-		}
-		
-		do.orderRepoPkg(pkg, dp)
-		return nil
-	})
-
-	do.repo = append(do.repo, pkg)
+func (do *depOrder) orderPkgRepo(pkg *alpm.Package, dp *depPool, runtime bool) {
+	if runtime {
+		do.Runtime.set(pkg.Name())
+	}
+	do.Repo = append(do.Repo, pkg)
 	delete(dp.Repo, pkg.Name())
 
+	pkg.Depends().ForEach(func(dep alpm.Depend) (err error) {
+		repoPkg := dp.findSatisfierRepo(dep.String())
+		if repoPkg != nil {
+			do.orderPkgRepo(repoPkg, dp, runtime)
+		}
+		
+		return nil
+	})
 }
