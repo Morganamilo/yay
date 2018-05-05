@@ -112,22 +112,22 @@ func makeDependencyTree() (*dependencyTree, error) {
 
 func (dt *dependencyTree) String() string {
 	str := ""
-	str += "\nRepo (" + strconv.Itoa(len(dt.Repo)) + ") :"
+	str += "\n" + red("Repo") + " (" + strconv.Itoa(len(dt.Repo)) + ") :"
 	for _, pkg := range dt.Repo {
 		str += " " + pkg.Name()
 	}
 
-	str += "\nAur (" + strconv.Itoa(len(dt.Aur)) + ") :"
+	str += "\n"+red("Aur")+" (" + strconv.Itoa(len(dt.Aur)) + ") :"
 	for pkg := range dt.Aur {
 		str += " " + pkg
 	}
 
-	str += "\nAur Cache (" + strconv.Itoa(len(dt.AurCache)) + ") :"
+	str += "\n" + red("Aur Cache") +" (" + strconv.Itoa(len(dt.AurCache)) + ") :"
 	for pkg := range dt.AurCache {
 		str += " " + pkg
 	}
 
-	str += "\nGroups (" + strconv.Itoa(len(dt.Groups)) + ") :"
+	str += "\n" + red("Groups")+" (" + strconv.Itoa(len(dt.Groups)) + ") :"
 	for _, pkg := range dt.Groups {
 		str += " " + pkg
 	}
@@ -252,14 +252,15 @@ func (dt *dependencyTree) ResolveTargets() error {
 func (dt *dependencyTree) superFetch(pkgs stringSet) error {
 	var mux sync.Mutex
 	var wg sync.WaitGroup
-	var err error
 
 	doSearch := func(pkg string) {
 		defer wg.Done()
 
-		results, localerr := rpc.SearchByNameDesc(pkg)
-		if localerr != nil {
-			err = localerr
+		results, err := rpc.SearchByNameDesc(pkg)
+		if err != nil {
+			//Superfetch is not really a needed feature so it
+			//should be fine to ignore errors
+			fmt.Println("Error searching for:", pkg)
 			return
 		}
 
@@ -292,7 +293,11 @@ func (dt *dependencyTree) cacheAURPackages(_pkgs stringSet) error {
 		}
 	}
 
-	//TODO: config option, maybe --deepfetch but aur man uses that flag for
+	if len(pkgs) == 0 {
+		return nil
+	}
+
+	//TODO: config option, maybe --deepsearh but aurman uses that flag for
 	//something else already which might be confusing
 	//maybe --provides
 	if true {
@@ -307,10 +312,6 @@ func (dt *dependencyTree) cacheAURPackages(_pkgs stringSet) error {
 			name, _, _ := splitDep(pkg)
 			query = append(query, name)
 		}
-	}
-
-	if len(pkgs) == 0 {
-		return nil
 	}
 
 	info, err := aurInfo(query, dt.Warnings)
@@ -340,7 +341,6 @@ func (dt *dependencyTree) resolveAURPackages(pkgs stringSet) error {
 	}
 
 	for name := range pkgs {
-		fmt.Println(name)
 		_, ok := dt.Aur[name]
 		if ok {
 			continue
@@ -459,17 +459,31 @@ func (dt *dependencyTree) findSatisfierAur(dep string) *rpc.Pkg {
 	return nil
 }
 
+// This is mostly used to promote packages from the cache
+// to the Install list
+// Provide a pacman style provider menu if theres more than one candidate
+// TODO: maybe intermix repo providers in the menu
 func (dt *dependencyTree) findSatisfierAurCache(dep string) *rpc.Pkg {
+	providers := make([]*rpc.Pkg, 0)
+
 	for _, pkg := range dt.AurCache {
 		if pkgSatisfies(pkg.Name, pkg.Version, dep) {
-			return pkg
+			providers = append(providers, pkg)
+			continue
 		}
-
 		for _, provide := range pkg.Provides {
 			if provideSatisfies(provide, dep) {
-				return pkg
+				providers = append(providers, pkg)
 			}
 		}
+	}
+	
+	if len(providers) == 1 {
+		return providers[0]
+	}
+
+	if len(providers) > 1 {
+		return providerMenu(dep, providers)
 	}
 
 	return nil
