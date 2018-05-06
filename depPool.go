@@ -466,13 +466,27 @@ func (dp *depPool) findSatisfierAur(dep string) *rpc.Pkg {
 // Provide a pacman style provider menu if theres more than one candidate
 // TODO: maybe intermix repo providers in the menu
 func (dp *depPool) findSatisfierAurCache(dep string) *rpc.Pkg {
-	providers := make([]*rpc.Pkg, 0)
 
+			_, err := d.PkgByName(k.Name())
+
+	//first look for a matching package name
+	//for _, pkg := range dp.AurCache {
+
+	//second look for an already installed package
+	pkg, err := dp.LocalDb.PkgCache().FindSatisfier(dep)
+	if err == nil {
+		if provider, ok := dp.AurCache[pkg.Name()]; ok {
+			return provider
+		}
+	}
+
+	//try to match providers
+	providers := make([]*rpc.Pkg, 0)
 	for _, pkg := range dp.AurCache {
 		if pkgSatisfies(pkg.Name, pkg.Version, dep) {
 			providers = append(providers, pkg)
-			continue
 		}
+
 		for _, provide := range pkg.Provides {
 			if provideSatisfies(provide, dep) {
 				providers = append(providers, pkg)
