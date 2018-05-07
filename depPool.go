@@ -501,17 +501,13 @@ func (dp *depPool) hasPackage(name string) bool {
 
 type missing struct {
 	Good stringSet
-	Bad  map[string]int
-	Missing []string
-	WantedBy [][]string
+	Missing map[string][]string
 }
 
 func (dp *depPool) CheckMissing() ([]string, [][]string) {
 	missing := &missing {
 		make(stringSet),
-		make(map[string]int),
-		make([]string, 0),
-		make([][]string, 0),
+		make(map[string][]string),
 	}
 
 	for _, target := range dp.Targets {
