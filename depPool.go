@@ -13,6 +13,8 @@ import (
 
 type source int
 
+const PROVIDES = true
+
 const (
 	repository source = iota
 	build
@@ -256,19 +258,29 @@ func (dp *depPool) ResolveTargets(pkgs []string) error {
 // Ofcouse only the first three packages provide yay, the rest are just false
 // positives.
 //
-// This method increasing dependency resolving time expenentionally
-func (dp *depPool) superFetch(pkgs stringSet) error {
+// This method increases dependency resolve time
+func (dp *depPool) findProvides(pkgs stringSet) error {
 	var mux sync.Mutex
 	var wg sync.WaitGroup
 
 	doSearch := func(pkg string) {
 		defer wg.Done()
+		var err error
+		var results []rpc.Pkg
 
-		results, err := rpc.SearchByNameDesc(pkg)
+		// Hack for a bigger search result, if the user wants
+		// java-envronment we can search for just java instead and get
+		// more hits.
+		words := strings.Split(pkg, "-")
+
+		for i := range words {
+			results, err = rpc.SearchByNameDesc(strings.Join(words[:i + 1], "-"))
+			if err == nil {
+				break
+			}
+		}
+		
 		if err != nil {
-			//Superfetch is not really a needed feature so it
-			//should be fine to ignore errors
-			fmt.Println("Error searching for:", pkg)
 			return
 		}
 
@@ -308,8 +320,8 @@ func (dp *depPool) cacheAURPackages(_pkgs stringSet) error {
 	//TODO: config option, maybe --deepsearh but aurman uses that flag for
 	//something else already which might be confusing
 	//maybe --provides
-	if true {
-		err := dp.superFetch(pkgs)
+	if PROVIDES {
+		err := dp.findProvides(pkgs)
 		if err != nil {
 			return err
 		}
@@ -467,12 +479,6 @@ func (dp *depPool) findSatisfierAur(dep string) *rpc.Pkg {
 // TODO: maybe intermix repo providers in the menu
 func (dp *depPool) findSatisfierAurCache(dep string) *rpc.Pkg {
 
-			_, err := d.PkgByName(k.Name())
-
-	//first look for a matching package name
-	//for _, pkg := range dp.AurCache {
-
-	//second look for an already installed package
 	pkg, err := dp.LocalDb.PkgCache().FindSatisfier(dep)
 	if err == nil {
 		if provider, ok := dp.AurCache[pkg.Name()]; ok {
