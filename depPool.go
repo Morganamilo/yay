@@ -501,20 +501,20 @@ func (dp *depPool) hasPackage(name string) bool {
 
 type missing struct {
 	Good stringSet
-	Missing map[string][]string
+	Missing map[string][][]string
 }
 
-func (dp *depPool) CheckMissing() ([]string, [][]string) {
+func (dp *depPool) CheckMissing() (map[string][][]string) {
 	missing := &missing {
 		make(stringSet),
-		make(map[string][]string),
+		make(map[string][][]string),
 	}
 
 	for _, target := range dp.Targets {
 		dp._checkMissing(target.DepString(), make([]string, 0), missing,)
 	}
 
-	return missing.Missing, missing.WantedBy
+	return missing.Missing
 }
 
 
@@ -528,12 +528,13 @@ func (dp *depPool) _checkMissing(dep string, stack []string, missing *missing) {
 		return
 	}
 
-	if i, ok := missing.Bad[dep]; ok {
-		if stringSliceEqual(missing.WantedBy[i],stack) {
-			return
+	if trees, ok := missing.Missing[dep]; ok {
+		for _, tree := range trees {
+			if stringSliceEqual(tree, stack) {
+				return
+			}
 		}
-		missing.Missing = append(missing.Missing, dep)
-		missing.WantedBy = append(missing.WantedBy, stack)
+		missing.Missing[dep] = append(missing.Missing[dep], stack)
 		return
 	}
 
@@ -560,7 +561,5 @@ func (dp *depPool) _checkMissing(dep string, stack []string, missing *missing) {
 		return
 	}
 
-	missing.Bad[dep] = len(missing.WantedBy)
-	missing.Missing = append(missing.Missing, dep)
-	missing.WantedBy = append(missing.WantedBy, stack)
+	missing.Missing[dep] = [][]string{stack}
 }
