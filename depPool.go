@@ -12,7 +12,7 @@ import (
 )
 
 
-const PROVIDES = true
+const PROVIDES = false
 
 type target struct {
 	Db      string
@@ -497,4 +497,74 @@ func (dp *depPool) hasPackage(name string) bool {
 	}
 
 	return false
+}
+
+type missing struct {
+	Good stringSet
+	Bad  map[string]int
+	Missing []string
+	WantedBy [][]string
+}
+
+func (dp *depPool) CheckMissing() ([]string, [][]string) {
+	missing := &missing {
+		make(stringSet),
+		make(map[string]int),
+		make([]string, 0),
+		make([][]string, 0),
+	}
+
+	for _, target := range dp.Targets {
+		dp._checkMissing(target.DepString(), make([]string, 0), missing,)
+	}
+
+	return missing.Missing, missing.WantedBy
+}
+
+
+func (dp *depPool) _checkMissing(dep string, stack []string, missing *missing) {
+	if _, err := dp.LocalDb.PkgCache().FindSatisfier(dep); err == nil {
+		missing.Good.set(dep)
+		return
+	}
+
+	if missing.Good.get(dep) {
+		return
+	}
+
+	if i, ok := missing.Bad[dep]; ok {
+		if stringSliceEqual(missing.WantedBy[i],stack) {
+			return
+		}
+		missing.Missing = append(missing.Missing, dep)
+		missing.WantedBy = append(missing.WantedBy, stack)
+		return
+	}
+
+	aurPkg := dp.findSatisfierAur(dep)
+	if aurPkg != nil {
+		missing.Good.set(dep)
+		for _, deps := range [3][]string{aurPkg.Depends, aurPkg.MakeDepends, aurPkg.CheckDepends} {
+			for _, aurDep := range deps {
+				dp._checkMissing(aurDep, append(stack, aurPkg.Name), missing)
+			}
+		}
+
+		return
+	}
+
+	repoPkg := dp.findSatisfierRepo(dep)
+	if repoPkg != nil {
+		missing.Good.set(dep)
+		repoPkg.Depends().ForEach(func(repoDep alpm.Depend) error {
+			dp._checkMissing(repoDep.String(), append(stack, repoPkg.Name()), missing)
+			return nil
+		})
+
+		return
+	}
+
+	missing.Bad[dep] = len(missing.WantedBy)
+	missing.Missing = append(missing.Missing, dep)
+	missing.WantedBy = append(missing.WantedBy, stack)
 }

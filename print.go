@@ -594,3 +594,26 @@ func providerMenu(dep string, providers []*rpc.Pkg) *rpc.Pkg {
 
 	return nil
 }
+
+
+
+
+
+func printMissing(missing []string, wantedBy [][]string) {
+	fmt.Println(bold(red(arrow+" Error: ")) + "Could not find all required packages:")
+	for i, dep := range missing {
+		pkgs := wantedBy[i]
+
+		fmt.Print("    " + cyan(dep), " (Tree: ")
+
+		if len(pkgs) == 0 {
+			fmt.Print(cyan("Target "))
+		} else {
+			for _, pkg := range pkgs {
+				fmt.Print(cyan(pkg), " -> ")
+			}
+		}
+
+		fmt.Println(")")
+	}
+}
