@@ -134,14 +134,5 @@ func (do *depOrder) getMakeOnlyRepo() stringSet {
 	return makeOnly
 }
 
-func (do *depOrder) getMakeOnlyAur() stringSet {
-	makeOnly := make(stringSet)
-
-	for _, pkg := range do.Aur {
-		if !do.Runtime.get(pkg.Name) {
-			makeOnly.set(pkg.Name)
-		}
-	}
-
-	return makeOnly
+func (do *depOrder) checkMissing() {
 }
