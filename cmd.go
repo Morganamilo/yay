@@ -309,8 +309,11 @@ func handleVersion() {
 	dp, err := getDepPool(cmdArgs.targets.toSlice())
 	fmt.Println(dp, "\nError:", err)
 
-	missing := dp.CheckMissing()
-	printMissing(missing)
+	err = dp.CheckMissing()
+	fmt.Println(err)
+
+	err = dp.CheckConflicts()
+	fmt.Println(err)
 
 	do := getDepOrder(dp)
 	fmt.Println(do)

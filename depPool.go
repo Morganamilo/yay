@@ -401,14 +401,8 @@ func getDepPool(pkgs []string) (*depPool, error) {
 
 func (dp *depPool) findSatisfierAur(dep string) *rpc.Pkg {
 	for _, pkg := range dp.Aur {
-		if pkgSatisfies(pkg.Name, pkg.Version, dep) {
+		if satisfiesAur(dep, pkg) {
 			return pkg
-		}
-
-		for _, provide := range pkg.Provides {
-			if provideSatisfies(provide, dep) {
-				return pkg
-			}
 		}
 	}
 
@@ -420,21 +414,15 @@ func (dp *depPool) findSatisfierAur(dep string) *rpc.Pkg {
 // Provide a pacman style provider menu if theres more than one candidate
 // TODO: maybe intermix repo providers in the menu
 func (dp *depPool) findSatisfierAurCache(dep string) *rpc.Pkg {
-
-	pkg, err := dp.LocalDb.PkgCache().FindSatisfier(dep)
-	if err == nil {
-		if provider, ok := dp.AurCache[pkg.Name()]; ok {
-			return provider
-		}
-	}
-
 	//try to match providers
 	providers := make([]*rpc.Pkg, 0)
 	for _, pkg := range dp.AurCache {
 		if pkgSatisfies(pkg.Name, pkg.Version, dep) {
-			providers = append(providers, pkg)
+			return pkg
 		}
+	}
 
+	for _, pkg := range dp.AurCache {
 		for _, provide := range pkg.Provides {
 			if provideSatisfies(provide, dep) {
 				providers = append(providers, pkg)
@@ -455,17 +443,7 @@ func (dp *depPool) findSatisfierAurCache(dep string) *rpc.Pkg {
 
 func (dp *depPool) findSatisfierRepo(dep string) *alpm.Package {
 	for _, pkg := range dp.Repo {
-		if pkgSatisfies(pkg.Name(), pkg.Version(), dep) {
-			return pkg
-		}
-
-		if pkg.Provides().ForEach(func(provide alpm.Depend) error {
-			if provideSatisfies(provide.String(), dep) {
-				return fmt.Errorf("")
-			}
-
-			return nil
-		}) != nil {
+		if satisfiesRepo(dep, pkg) {
 			return pkg
 		}
 	}
@@ -503,20 +481,6 @@ type missing struct {
 	Good stringSet
 	Missing map[string][][]string
 }
-
-func (dp *depPool) CheckMissing() (map[string][][]string) {
-	missing := &missing {
-		make(stringSet),
-		make(map[string][][]string),
-	}
-
-	for _, target := range dp.Targets {
-		dp._checkMissing(target.DepString(), make([]string, 0), missing,)
-	}
-
-	return missing.Missing
-}
-
 
 func (dp *depPool) _checkMissing(dep string, stack []string, missing *missing) {
 	if _, err := dp.LocalDb.PkgCache().FindSatisfier(dep); err == nil {
@@ -563,3 +527,39 @@ func (dp *depPool) _checkMissing(dep string, stack []string, missing *missing) {
 
 	missing.Missing[dep] = [][]string{stack}
 }
+
+func (dp *depPool) CheckMissing() error {
+	missing := &missing {
+		make(stringSet),
+		make(map[string][][]string),
+	}
+
+	for _, target := range dp.Targets {
+		dp._checkMissing(target.DepString(), make([]string, 0), missing,)
+	}
+
+	if len(missing.Missing) == 0 {
+		return nil
+	}
+
+	fmt.Println(bold(red(arrow+" Error: ")) + "Could not find all required packages:")
+	for dep, trees := range missing.Missing {
+		for _, tree := range trees {
+
+			fmt.Print("    " + cyan(dep), " (Tree: ")
+
+			if len(tree) == 0 {
+				fmt.Print(cyan("Target "))
+			} else {
+				for _, pkg := range tree {
+					fmt.Print(cyan(pkg), " -> ")
+				}
+			}
+
+			fmt.Println(")")
+		}
+	}
+
+	return fmt.Errorf("")
+}
+

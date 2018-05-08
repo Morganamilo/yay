@@ -596,9 +596,6 @@ func providerMenu(dep string, providers []*rpc.Pkg) *rpc.Pkg {
 }
 
 
-
-
-
 func printMissing(missing map[string][][]string) {
 	fmt.Println(bold(red(arrow+" Error: ")) + "Could not find all required packages:")
 	for dep, trees := range missing {

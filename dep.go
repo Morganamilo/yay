@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
 	alpm "github.com/jguer/go-alpm"
+	rpc "github.com/mikkeloscar/aur"
 )
 
 func splitDep(dep string) (string, string, string) {
@@ -67,4 +69,36 @@ func verSatisfies(ver1, mod, ver2 string) bool {
 	}
 
 	return true
+}
+
+func satisfiesAur(dep string, pkg *rpc.Pkg) bool {
+	if pkgSatisfies(pkg.Name, pkg.Version, dep) {
+			return true
+	}
+
+	for _, provide := range pkg.Provides {
+		if provideSatisfies(provide, dep) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func satisfiesRepo(dep string, pkg *alpm.Package) bool {
+	if pkgSatisfies(pkg.Name(), pkg.Version(), dep) {
+		return true
+	}
+
+	if pkg.Provides().ForEach(func(provide alpm.Depend) error {
+		if provideSatisfies(provide.String(), dep) {
+			return fmt.Errorf("")
+		}
+
+		return nil
+	}) != nil {
+		return true
+	}
+
+	return false
 }
