@@ -177,7 +177,7 @@ func install(parser *arguments) error {
 
 	if config.CleanMenu {
 		askClean := pkgbuildNumberMenu(do.Aur, do.Bases, remoteNamesCache)
-		toClean, err := cleanNumberMenu(do.Aur, remoteNamesCache, askClean)
+		toClean, err := cleanNumberMenu(do.Aur, do.Bases, remoteNamesCache, askClean)
 		if err != nil {
 			return err
 		}
@@ -185,7 +185,7 @@ func install(parser *arguments) error {
 		cleanBuilds(toClean)
 	}
 
-	toSkip := pkgBuildsToSkip(do.Aur, targets)
+	toSkip := pkgBuildsToSkip(do.Aur, do.Bases, targets)
 	cloned, err := downloadPkgBuilds(do.Aur, do.Bases, toSkip)
 	if err != nil {
 		return err
@@ -196,7 +196,7 @@ func install(parser *arguments) error {
 
 	if config.DiffMenu {
 		pkgbuildNumberMenu(do.Aur, do.Bases, remoteNamesCache)
-		toDiff, err = diffNumberMenu(do.Aur, remoteNamesCache)
+		toDiff, err = diffNumberMenu(do.Aur, do.Bases, remoteNamesCache)
 		if err != nil {
 			return err
 		}
@@ -232,7 +232,7 @@ func install(parser *arguments) error {
 
 	if config.EditMenu {
 		pkgbuildNumberMenu(do.Aur, do.Bases, remoteNamesCache)
-		toEdit, err = editNumberMenu(do.Aur, remoteNamesCache)
+		toEdit, err = editNumberMenu(do.Aur, do.Bases, remoteNamesCache)
 		if err != nil {
 			return err
 		}
@@ -494,7 +494,13 @@ func pkgbuildNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed st
 
 		toPrint += fmt.Sprintf(magenta("%3d")+" %-40s", len(pkgs)-n,
 			bold(formatPkgbase(bases[pkg])))
-		if installed.get(pkg) {
+
+		anyInstalled := false
+		for _, base := range bases[pkg] {
+			anyInstalled = anyInstalled || installed.get(base.Name)
+		}
+
+		if anyInstalled {
 			toPrint += bold(green(" (Installed)"))
 		}
 
@@ -511,7 +517,7 @@ func pkgbuildNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed st
 	return askClean
 }
 
-func cleanNumberMenu(pkgs []string, installed stringSet, hasClean bool) ([]string, error) {
+func cleanNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed stringSet, hasClean bool) ([]string, error) {
 	toClean := make([]string, 0)
 
 	if !hasClean {
@@ -535,6 +541,11 @@ func cleanNumberMenu(pkgs []string, installed stringSet, hasClean bool) ([]strin
 
 	if !cOtherInclude.get("n") && !cOtherInclude.get("none") {
 		for i, pkg := range pkgs {
+			anyInstalled := false
+			for _, base := range bases[pkg] {
+				anyInstalled = anyInstalled || installed.get(base.Name)
+			}
+
 			dir := filepath.Join(config.BuildDir, pkg)
 			if _, err := os.Stat(dir); os.IsNotExist(err) {
 				continue
@@ -544,12 +555,12 @@ func cleanNumberMenu(pkgs []string, installed stringSet, hasClean bool) ([]strin
 				continue
 			}
 
-			if installed.get(pkg) && (cOtherInclude.get("i") || cOtherInclude.get("installed")) {
+			if anyInstalled && (cOtherInclude.get("i") || cOtherInclude.get("installed")) {
 				toClean = append(toClean, pkg)
 				continue
 			}
 
-			if !installed.get(pkg) && (cOtherInclude.get("no") || cOtherInclude.get("notinstalled")) {
+			if !anyInstalled && (cOtherInclude.get("no") || cOtherInclude.get("notinstalled")) {
 				toClean = append(toClean, pkg)
 				continue
 			}
@@ -574,15 +585,15 @@ func cleanNumberMenu(pkgs []string, installed stringSet, hasClean bool) ([]strin
 	return toClean, nil
 }
 
-func editNumberMenu(pkgs []string, installed stringSet) ([]string, error) {
-	return editDiffNumberMenu(pkgs, installed, false)
+func editNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed stringSet) ([]string, error) {
+	return editDiffNumberMenu(pkgs, bases, installed, false)
 }
 
-func diffNumberMenu(pkgs []string, installed stringSet) ([]string, error) {
-	return editDiffNumberMenu(pkgs, installed, true)
+func diffNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed stringSet) ([]string, error) {
+	return editDiffNumberMenu(pkgs, bases, installed, true)
 }
 
-func editDiffNumberMenu(pkgs []string, installed stringSet, diff bool) ([]string, error) {
+func editDiffNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed stringSet, diff bool) ([]string, error) {
 	toEdit := make([]string, 0)
 	var editInput string
 	var err error
@@ -614,16 +625,21 @@ func editDiffNumberMenu(pkgs []string, installed stringSet, diff bool) ([]string
 
 	if !eOtherInclude.get("n") && !eOtherInclude.get("none") {
 		for i, pkg := range pkgs {
+			anyInstalled := false
+			for _, base := range bases[pkg] {
+				anyInstalled = anyInstalled || installed.get(base.Name)
+			}
+
 			if !eIsInclude && eExclude.get(len(pkgs)-i) {
 				continue
 			}
 
-			if installed.get(pkg) && (eOtherInclude.get("i") || eOtherInclude.get("installed")) {
+			if anyInstalled && (eOtherInclude.get("i") || eOtherInclude.get("installed")) {
 				toEdit = append(toEdit, pkg)
 				continue
 			}
 
-			if !installed.get(pkg) && (eOtherInclude.get("no") || eOtherInclude.get("notinstalled")) {
+			if !anyInstalled && (eOtherInclude.get("no") || eOtherInclude.get("notinstalled")) {
 				toEdit = append(toEdit, pkg)
 				continue
 			}
@@ -736,7 +752,7 @@ func parseSRCINFOFiles(pkgs []string, srcinfos map[string]*gosrc.Srcinfo, bases 
 
 		pkgbuild, err := gosrc.ParseFile(filepath.Join(dir, ".SRCINFO"))
 		if err != nil {
-			return fmt.Errorf("%s: %s", pkg, err)
+			return fmt.Errorf("%s: %s", formatPkgbase(bases[pkg]), err)
 		}
 
 		srcinfos[pkg] = pkgbuild
@@ -754,7 +770,7 @@ func tryParsesrcinfosFile(pkgs []string, srcinfos map[string]*gosrc.Srcinfo, bas
 
 		pkgbuild, err := gosrc.ParseFile(filepath.Join(dir, ".SRCINFO"))
 		if err != nil {
-			fmt.Printf("cannot parse %s skipping: %s\n", pkg, err)
+			fmt.Printf("cannot parse %s skipping: %s\n", formatPkgbase(bases[pkg]), err)
 			continue
 		}
 
@@ -762,17 +778,21 @@ func tryParsesrcinfosFile(pkgs []string, srcinfos map[string]*gosrc.Srcinfo, bas
 	}
 }
 
-func pkgBuildsToSkip(pkgs []string, targets stringSet) stringSet {
+func pkgBuildsToSkip(pkgs []string, bases map[string][]*rpc.Pkg, targets stringSet) stringSet {
 	toSkip := make(stringSet)
 
 	for _, pkg := range pkgs {
-		if config.ReDownload == "no" || (config.ReDownload == "yes" && !targets.get(pkg)) {
+		isTarget := false
+		for _, base := range bases[pkg] {
+			isTarget = isTarget || targets.get(base.Name)
+		}
+
+		if config.ReDownload == "no" || (config.ReDownload == "yes" && isTarget) {
 			dir := filepath.Join(config.BuildDir, pkg, ".SRCINFO")
 			pkgbuild, err := gosrc.ParseFile(dir)
 
 			if err == nil {
-				//TODO: use bases
-				if alpm.VerCmp(pkgbuild.Version(), "") >= 0 {
+				if alpm.VerCmp(pkgbuild.Version(), bases[pkg][0].Version) >= 0 {
 					toSkip.set(pkg)
 				}
 			}
@@ -884,7 +904,7 @@ func buildInstallPkgBuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc
 		//pkgver bump
 		err := show(passToMakepkg(dir, args...))
 		if err != nil {
-			return fmt.Errorf("Error making: %s", pkg)
+			return fmt.Errorf("Error making: %s", formatPkgbase(do.Bases[pkg]))
 		}
 
 		pkgdests, version, err := parsePackageList(dir)
@@ -892,8 +912,11 @@ func buildInstallPkgBuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc
 			return err
 		}
 
-		//TODO: fix split
-		if config.ReBuild == "no" || (config.ReBuild == "yes" && !dp.Explicit.get(pkg)) {
+		isExplicit := false
+		for _, base := range do.Bases[pkg] {
+			isExplicit = isExplicit || dp.Explicit.get(base.Name)
+		}
+		if config.ReBuild == "no" || (config.ReBuild == "yes" && isExplicit) {
 			for _, split := range do.Bases[pkg] {
 				pkgdest, ok := pkgdests[split.Name]
 				if !ok {
@@ -923,7 +946,7 @@ func buildInstallPkgBuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc
 
 			err := show(passToMakepkg(dir, args...))
 			if err != nil {
-				return fmt.Errorf("Error making: %s", pkg)
+				return fmt.Errorf("Error making: %s", formatPkgbase(do.Bases[pkg]))
 			}
 		}
 
