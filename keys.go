@@ -13,7 +13,7 @@ import (
 
 // pgpKeySet maps a PGP key with a list of PKGBUILDs that require it.
 // This is similar to stringSet, used throughout the code.
-type pgpKeySet map[string][]*rpc.Pkg
+type pgpKeySet map[string][]string
 
 func (set pgpKeySet) toSlice() []string {
 	slice := make([]string, 0, len(set))
@@ -23,14 +23,11 @@ func (set pgpKeySet) toSlice() []string {
 	return slice
 }
 
-func (set pgpKeySet) set(key string, p *rpc.Pkg) {
+func (set pgpKeySet) set(key string, p string) {
 	// Using ToUpper to make sure keys with a different case will be
 	// considered the same.
 	upperKey := strings.ToUpper(key)
-	if _, exists := set[upperKey]; !exists {
-		set[upperKey] = []*rpc.Pkg{}
-	}
-	set[key] = append(set[key], p)
+	set[key] = append(set[upperKey], p)
 }
 
 func (set pgpKeySet) get(key string) bool {
@@ -41,7 +38,7 @@ func (set pgpKeySet) get(key string) bool {
 
 // checkPgpKeys iterates through the keys listed in the PKGBUILDs and if needed,
 // asks the user whether yay should try to import them.
-func checkPgpKeys(pkgs []*rpc.Pkg, bases map[string][]*rpc.Pkg, srcinfos map[string]*gosrc.Srcinfo) error {
+func checkPgpKeys(pkgs []string, bases map[string][]*rpc.Pkg, srcinfos map[string]*gosrc.Srcinfo) error {
 	// Let's check the keys individually, and then we can offer to import
 	// the problematic ones.
 	problematic := make(pgpKeySet)
@@ -49,7 +46,7 @@ func checkPgpKeys(pkgs []*rpc.Pkg, bases map[string][]*rpc.Pkg, srcinfos map[str
 
 	// Mapping all the keys.
 	for _, pkg := range pkgs {
-		srcinfo := srcinfos[pkg.PackageBase]
+		srcinfo := srcinfos[pkg]
 
 		for _, key := range srcinfo.ValidPGPKeys {
 			// If key already marked as problematic, indicate the current
@@ -115,9 +112,9 @@ func formatKeysToImport(keys pgpKeySet, bases map[string][]*rpc.Pkg) (string, er
 	for key, pkgs := range keys {
 		pkglist := ""
 		for _, pkg := range pkgs {
-			pkglist += formatPkgbase(bases[pkg.PackageBase]) + " "
+			pkglist += formatPkgbase(bases[pkg]) + "  "
 		}
-		pkglist = strings.TrimRight(pkglist, " ")
+		pkglist = strings.TrimRight(pkglist, "  ")
 		buffer.WriteString(fmt.Sprintf("\n%s %s, required by: %s", yellow(bold(smallArrow)), cyan(key), cyan(pkglist)))
 	}
 	return buffer.String(), nil

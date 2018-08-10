@@ -6,7 +6,7 @@ import (
 )
 
 type depOrder struct {
-	Aur     []*rpc.Pkg
+	Aur     []string
 	Repo    []*alpm.Package
 	Runtime stringSet
 	Bases   map[string][]*rpc.Pkg
@@ -14,7 +14,7 @@ type depOrder struct {
 
 func makeDepOrder() *depOrder {
 	return &depOrder{
-		make([]*rpc.Pkg, 0),
+		make([]string, 0),
 		make([]*alpm.Package, 0),
 		make(stringSet),
 		make(map[string][]*rpc.Pkg),
@@ -66,8 +66,7 @@ func (do *depOrder) orderPkgAur(pkg *rpc.Pkg, dp *depPool, runtime bool) {
 	}
 
 	if _, ok := do.Bases[pkg.PackageBase]; !ok {
-		do.Aur = append(do.Aur, pkg)
-		do.Bases[pkg.PackageBase] = make([]*rpc.Pkg, 0)
+		do.Aur = append(do.Aur, pkg.PackageBase)
 	}
 	do.Bases[pkg.PackageBase] = append(do.Bases[pkg.PackageBase], pkg)
 }
