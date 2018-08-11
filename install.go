@@ -11,7 +11,6 @@ import (
 
 	gosrc "github.com/Morganamilo/go-srcinfo"
 	alpm "github.com/jguer/go-alpm"
-	rpc "github.com/mikkeloscar/aur"
 )
 
 // Install handles package installs
@@ -157,7 +156,7 @@ func install(parser *arguments) error {
 		arguments.addTarget(pkg)
 	}
 
-	if len(do.Aur) == 0 && len(arguments.targets) == 0 && (!parser.existsArg("u", "sysupgrade") || mode == ModeAUR) {
+	if len(do.REALBASES) == 0 && len(arguments.targets) == 0 && (!parser.existsArg("u", "sysupgrade") || mode == ModeAUR) {
 		fmt.Println(" there is nothing to do")
 		return nil
 	}
@@ -176,8 +175,8 @@ func install(parser *arguments) error {
 	}
 
 	if config.CleanMenu {
-		askClean := pkgbuildNumberMenu(do.Aur, do.Bases, remoteNamesCache)
-		toClean, err := cleanNumberMenu(do.Aur, do.Bases, remoteNamesCache, askClean)
+		askClean := pkgbuildNumberMenu(do.REALBASES, remoteNamesCache)
+		toClean, err := cleanNumberMenu(do.REALBASES, remoteNamesCache, askClean)
 		if err != nil {
 			return err
 		}
@@ -185,24 +184,24 @@ func install(parser *arguments) error {
 		cleanBuilds(toClean)
 	}
 
-	toSkip := pkgBuildsToSkip(do.Aur, do.Bases, targets)
-	cloned, err := downloadPkgBuilds(do.Aur, do.Bases, toSkip)
+	toSkip := pkgBuildsToSkip(do.REALBASES, targets)
+	cloned, err := downloadPkgBuilds(do.REALBASES, toSkip)
 	if err != nil {
 		return err
 	}
 
-	var toDiff []string
-	var toEdit []string
+	var toDiff []Base
+	var toEdit []Base
 
 	if config.DiffMenu {
-		pkgbuildNumberMenu(do.Aur, do.Bases, remoteNamesCache)
-		toDiff, err = diffNumberMenu(do.Aur, do.Bases, remoteNamesCache)
+		pkgbuildNumberMenu(do.REALBASES, remoteNamesCache)
+		toDiff, err = diffNumberMenu(do.REALBASES, remoteNamesCache)
 		if err != nil {
 			return err
 		}
 
 		if len(toDiff) > 0 {
-			err = showPkgBuildDiffs(toDiff, do.Bases, cloned)
+			err = showPkgBuildDiffs(toDiff, cloned)
 			if err != nil {
 				return err
 			}
@@ -219,20 +218,20 @@ func install(parser *arguments) error {
 		config.NoConfirm = oldValue
 	}
 
-	err = mergePkgBuilds(do.Aur)
+	err = mergePkgBuilds(do.REALBASES)
 	if err != nil {
 		return err
 	}
 
 	//initial srcinfo parse before pkgver() bump
-	err = parseSRCINFOFiles(do.Aur, srcinfosStale, do.Bases)
+	err = parseSRCINFOFiles(do.REALBASES, srcinfosStale)
 	if err != nil {
 		return err
 	}
 
 	if config.EditMenu {
-		pkgbuildNumberMenu(do.Aur, do.Bases, remoteNamesCache)
-		toEdit, err = editNumberMenu(do.Aur, do.Bases, remoteNamesCache)
+		pkgbuildNumberMenu(do.REALBASES, remoteNamesCache)
+		toEdit, err = editNumberMenu(do.REALBASES, remoteNamesCache)
 		if err != nil {
 			return err
 		}
@@ -255,13 +254,14 @@ func install(parser *arguments) error {
 		config.NoConfirm = oldValue
 	}
 
-	incompatible, err = getIncompatible(do.Aur, srcinfosStale)
+	//TODO: fix for split packages maybe?
+	incompatible, err = getIncompatible(do.REALBASES, srcinfosStale)
 	if err != nil {
 		return err
 	}
 
 	if config.PGPFetch {
-		err = checkPgpKeys(do.Aur, do.Bases, srcinfosStale)
+		err = checkPgpKeys(do.REALBASES, srcinfosStale)
 		if err != nil {
 			return err
 		}
@@ -312,7 +312,7 @@ func install(parser *arguments) error {
 
 	go updateCompletion(false)
 
-	err = downloadPkgBuildsSources(do.Aur, do.Bases, incompatible)
+	err = downloadPkgBuildsSources(do.REALBASES, incompatible)
 	if err != nil {
 		return err
 	}
@@ -341,7 +341,7 @@ func install(parser *arguments) error {
 	}
 
 	if config.CleanAfter {
-		clean(do.Aur)
+		clean(do.REALBASES)
 	}
 
 	return nil
@@ -416,7 +416,7 @@ func earlyRefresh(parser *arguments) error {
 	return show(passToPacman(arguments))
 }
 
-func getIncompatible(pkgs []string, srcinfos map[string]*gosrc.Srcinfo) (stringSet, error) {
+func getIncompatible(bases []Base, srcinfos map[string]*gosrc.Srcinfo) (stringSet, error) {
 	incompatible := make(stringSet)
 	alpmArch, err := alpmHandle.Arch()
 	if err != nil {
@@ -424,14 +424,14 @@ func getIncompatible(pkgs []string, srcinfos map[string]*gosrc.Srcinfo) (stringS
 	}
 
 nextpkg:
-	for _, pkg := range pkgs {
-		for _, arch := range srcinfos[pkg].Arch {
+	for _, base := range bases {
+		for _, arch := range srcinfos[base.Pkgbase()].Arch {
 			if arch == "any" || arch == alpmArch {
 				continue nextpkg
 			}
 		}
 
-		incompatible.set(pkg)
+		incompatible.set(base.Pkgbase())
 	}
 
 	if len(incompatible) > 0 {
@@ -485,19 +485,20 @@ func parsePackageList(dir string) (map[string]string, string, error) {
 	return pkgdests, version, nil
 }
 
-func pkgbuildNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed stringSet) bool {
+func pkgbuildNumberMenu(bases []Base, installed stringSet) bool {
 	toPrint := ""
 	askClean := false
 
-	for n, pkg := range pkgs {
+	for n, base := range bases {
+		pkg := base.Pkgbase()
 		dir := filepath.Join(config.BuildDir, pkg)
 
-		toPrint += fmt.Sprintf(magenta("%3d")+" %-40s", len(pkgs)-n,
-			bold(formatPkgbase(bases[pkg])))
+		toPrint += fmt.Sprintf(magenta("%3d")+" %-40s", len(bases)-n,
+			bold(formatPkgbase(base)))
 
 		anyInstalled := false
-		for _, base := range bases[pkg] {
-			anyInstalled = anyInstalled || installed.get(base.Name)
+		for _, b := range base {
+			anyInstalled = anyInstalled || installed.get(b.Name)
 		}
 
 		if anyInstalled {
@@ -517,8 +518,8 @@ func pkgbuildNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed st
 	return askClean
 }
 
-func cleanNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed stringSet, hasClean bool) ([]string, error) {
-	toClean := make([]string, 0)
+func cleanNumberMenu(bases []Base, installed stringSet, hasClean bool) ([]Base, error) {
+	toClean := make([]Base, 0)
 
 	if !hasClean {
 		return toClean, nil
@@ -540,10 +541,11 @@ func cleanNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed strin
 	}
 
 	if !cOtherInclude.get("n") && !cOtherInclude.get("none") {
-		for i, pkg := range pkgs {
+		for i, base := range bases {
+			pkg := base.Pkgbase()
 			anyInstalled := false
-			for _, base := range bases[pkg] {
-				anyInstalled = anyInstalled || installed.get(base.Name)
+			for _, b := range base {
+				anyInstalled = anyInstalled || installed.get(b.Name)
 			}
 
 			dir := filepath.Join(config.BuildDir, pkg)
@@ -551,32 +553,32 @@ func cleanNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed strin
 				continue
 			}
 
-			if !cIsInclude && cExclude.get(len(pkgs)-i) {
+			if !cIsInclude && cExclude.get(len(bases)-i) {
 				continue
 			}
 
 			if anyInstalled && (cOtherInclude.get("i") || cOtherInclude.get("installed")) {
-				toClean = append(toClean, pkg)
+				toClean = append(toClean, base)
 				continue
 			}
 
 			if !anyInstalled && (cOtherInclude.get("no") || cOtherInclude.get("notinstalled")) {
-				toClean = append(toClean, pkg)
+				toClean = append(toClean, base)
 				continue
 			}
 
 			if cOtherInclude.get("a") || cOtherInclude.get("all") {
-				toClean = append(toClean, pkg)
+				toClean = append(toClean, base)
 				continue
 			}
 
-			if cIsInclude && (cInclude.get(len(pkgs)-i) || cOtherInclude.get(pkg)) {
-				toClean = append(toClean, pkg)
+			if cIsInclude && (cInclude.get(len(bases)-i) || cOtherInclude.get(pkg)) {
+				toClean = append(toClean, base)
 				continue
 			}
 
-			if !cIsInclude && (!cExclude.get(len(pkgs)-i) && !cOtherExclude.get(pkg)) {
-				toClean = append(toClean, pkg)
+			if !cIsInclude && (!cExclude.get(len(bases)-i) && !cOtherExclude.get(pkg)) {
+				toClean = append(toClean, base)
 				continue
 			}
 		}
@@ -585,16 +587,16 @@ func cleanNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed strin
 	return toClean, nil
 }
 
-func editNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed stringSet) ([]string, error) {
-	return editDiffNumberMenu(pkgs, bases, installed, false)
+func editNumberMenu(bases []Base, installed stringSet) ([]Base, error) {
+	return editDiffNumberMenu(bases, installed, false)
 }
 
-func diffNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed stringSet) ([]string, error) {
-	return editDiffNumberMenu(pkgs, bases, installed, true)
+func diffNumberMenu(bases []Base, installed stringSet) ([]Base, error) {
+	return editDiffNumberMenu(bases, installed, true)
 }
 
-func editDiffNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed stringSet, diff bool) ([]string, error) {
-	toEdit := make([]string, 0)
+func editDiffNumberMenu(bases []Base, installed stringSet, diff bool) ([]Base, error) {
+	toEdit := make([]Base, 0)
 	var editInput string
 	var err error
 
@@ -624,37 +626,38 @@ func editDiffNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed st
 	}
 
 	if !eOtherInclude.get("n") && !eOtherInclude.get("none") {
-		for i, pkg := range pkgs {
+		for i, base := range bases {
+			pkg := base.Pkgbase()
 			anyInstalled := false
-			for _, base := range bases[pkg] {
-				anyInstalled = anyInstalled || installed.get(base.Name)
+			for _, b := range base {
+				anyInstalled = anyInstalled || installed.get(b.Name)
 			}
 
-			if !eIsInclude && eExclude.get(len(pkgs)-i) {
+			if !eIsInclude && eExclude.get(len(bases)-i) {
 				continue
 			}
 
 			if anyInstalled && (eOtherInclude.get("i") || eOtherInclude.get("installed")) {
-				toEdit = append(toEdit, pkg)
+				toEdit = append(toEdit, base)
 				continue
 			}
 
 			if !anyInstalled && (eOtherInclude.get("no") || eOtherInclude.get("notinstalled")) {
-				toEdit = append(toEdit, pkg)
+				toEdit = append(toEdit, base)
 				continue
 			}
 
 			if eOtherInclude.get("a") || eOtherInclude.get("all") {
-				toEdit = append(toEdit, pkg)
+				toEdit = append(toEdit, base)
 				continue
 			}
 
-			if eIsInclude && (eInclude.get(len(pkgs)-i) || eOtherInclude.get(pkg)) {
-				toEdit = append(toEdit, pkg)
+			if eIsInclude && (eInclude.get(len(bases)-i) || eOtherInclude.get(pkg)) {
+				toEdit = append(toEdit, base)
 			}
 
-			if !eIsInclude && (!eExclude.get(len(pkgs)-i) && !eOtherExclude.get(pkg)) {
-				toEdit = append(toEdit, pkg)
+			if !eIsInclude && (!eExclude.get(len(bases)-i) && !eOtherExclude.get(pkg)) {
+				toEdit = append(toEdit, base)
 			}
 		}
 	}
@@ -662,16 +665,17 @@ func editDiffNumberMenu(pkgs []string, bases map[string][]*rpc.Pkg, installed st
 	return toEdit, nil
 }
 
-func cleanBuilds(pkgs []string) {
-	for i, pkg := range pkgs {
-		dir := filepath.Join(config.BuildDir, pkg)
-		fmt.Printf(bold(cyan("::")+" Deleting (%d/%d): %s\n"), i+1, len(pkgs), cyan(dir))
+func cleanBuilds(bases []Base) {
+	for i, base := range bases {
+		dir := filepath.Join(config.BuildDir, base.Pkgbase())
+		fmt.Printf(bold(cyan("::")+" Deleting (%d/%d): %s\n"), i+1, len(bases), cyan(dir))
 		os.RemoveAll(dir)
 	}
 }
 
-func showPkgBuildDiffs(pkgs []string, bases map[string][]*rpc.Pkg, cloned stringSet) error {
-	for _, pkg := range pkgs {
+func showPkgBuildDiffs(bases []Base, cloned stringSet) error {
+	for _, base := range bases {
+		pkg := base.Pkgbase()
 		dir := filepath.Join(config.BuildDir, pkg)
 		if shouldUseGit(dir) {
 			start := "HEAD"
@@ -685,7 +689,7 @@ func showPkgBuildDiffs(pkgs []string, bases map[string][]*rpc.Pkg, cloned string
 				}
 
 				if !hasDiff {
-					fmt.Printf("%s %s: %s\n", bold(yellow(arrow)), cyan(formatPkgbase(bases[pkg])), bold("No changes -- skipping"))
+					fmt.Printf("%s %s: %s\n", bold(yellow(arrow)), cyan(formatPkgbase(base)), bold("No changes -- skipping"))
 					continue
 				}
 			}
@@ -716,9 +720,10 @@ func showPkgBuildDiffs(pkgs []string, bases map[string][]*rpc.Pkg, cloned string
 	return nil
 }
 
-func editPkgBuilds(pkgs []string, srcinfos map[string]*gosrc.Srcinfo) error {
-	pkgbuilds := make([]string, 0, len(pkgs))
-	for _, pkg := range pkgs {
+func editPkgBuilds(bases []Base, srcinfos map[string]*gosrc.Srcinfo) error {
+	pkgbuilds := make([]string, 0, len(bases))
+	for _, base := range bases {
+		pkg := base.Pkgbase()
 		dir := filepath.Join(config.BuildDir, pkg)
 		pkgbuilds = append(pkgbuilds, filepath.Join(dir, "PKGBUILD"))
 
@@ -743,16 +748,17 @@ func editPkgBuilds(pkgs []string, srcinfos map[string]*gosrc.Srcinfo) error {
 	return nil
 }
 
-func parseSRCINFOFiles(pkgs []string, srcinfos map[string]*gosrc.Srcinfo, bases map[string][]*rpc.Pkg) error {
-	for k, pkg := range pkgs {
+func parseSRCINFOFiles(bases []Base, srcinfos map[string]*gosrc.Srcinfo) error {
+	for k, base := range bases {
+		pkg := base.Pkgbase()
 		dir := filepath.Join(config.BuildDir, pkg)
 
 		str := bold(cyan("::") + " Parsing SRCINFO (%d/%d): %s\n")
-		fmt.Printf(str, k+1, len(pkgs), cyan(formatPkgbase(bases[pkg])))
+		fmt.Printf(str, k+1, len(bases), cyan(formatPkgbase(base)))
 
 		pkgbuild, err := gosrc.ParseFile(filepath.Join(dir, ".SRCINFO"))
 		if err != nil {
-			return fmt.Errorf("%s: %s", formatPkgbase(bases[pkg]), err)
+			return fmt.Errorf("%s: %s", formatPkgbase(base), err)
 		}
 
 		srcinfos[pkg] = pkgbuild
@@ -761,16 +767,17 @@ func parseSRCINFOFiles(pkgs []string, srcinfos map[string]*gosrc.Srcinfo, bases 
 	return nil
 }
 
-func tryParsesrcinfosFile(pkgs []string, srcinfos map[string]*gosrc.Srcinfo, bases map[string][]*rpc.Pkg) {
-	for k, pkg := range pkgs {
+func tryParsesrcinfosFile(bases []Base, srcinfos map[string]*gosrc.Srcinfo) {
+	for k, base := range bases {
+		pkg := base.Pkgbase()
 		dir := filepath.Join(config.BuildDir, pkg)
 
 		str := bold(cyan("::") + " Parsing SRCINFO (%d/%d): %s\n")
-		fmt.Printf(str, k+1, len(pkgs), cyan(formatPkgbase(bases[pkg])))
+		fmt.Printf(str, k+1, len(bases), cyan(formatPkgbase(base)))
 
 		pkgbuild, err := gosrc.ParseFile(filepath.Join(dir, ".SRCINFO"))
 		if err != nil {
-			fmt.Printf("cannot parse %s skipping: %s\n", formatPkgbase(bases[pkg]), err)
+			fmt.Printf("cannot parse %s skipping: %s\n", formatPkgbase(base), err)
 			continue
 		}
 
@@ -778,22 +785,22 @@ func tryParsesrcinfosFile(pkgs []string, srcinfos map[string]*gosrc.Srcinfo, bas
 	}
 }
 
-func pkgBuildsToSkip(pkgs []string, bases map[string][]*rpc.Pkg, targets stringSet) stringSet {
+func pkgBuildsToSkip(bases []Base, targets stringSet) stringSet {
 	toSkip := make(stringSet)
 
-	for _, pkg := range pkgs {
+	for _, base := range bases {
 		isTarget := false
-		for _, base := range bases[pkg] {
-			isTarget = isTarget || targets.get(base.Name)
+		for _, pkg := range base {
+			isTarget = isTarget || targets.get(pkg.Name)
 		}
 
 		if config.ReDownload == "no" || (config.ReDownload == "yes" && isTarget) {
-			dir := filepath.Join(config.BuildDir, pkg, ".SRCINFO")
+			dir := filepath.Join(config.BuildDir, base.Pkgbase(), ".SRCINFO")
 			pkgbuild, err := gosrc.ParseFile(dir)
 
 			if err == nil {
-				if alpm.VerCmp(pkgbuild.Version(), bases[pkg][0].Version) >= 0 {
-					toSkip.set(pkg)
+				if alpm.VerCmp(pkgbuild.Version(), base.Version()) >= 0 {
+					toSkip.set(base.Pkgbase())
 				}
 			}
 		}
@@ -802,10 +809,10 @@ func pkgBuildsToSkip(pkgs []string, bases map[string][]*rpc.Pkg, targets stringS
 	return toSkip
 }
 
-func mergePkgBuilds(pkgs []string) error {
-	for _, pkg := range pkgs {
-		if shouldUseGit(filepath.Join(config.BuildDir, pkg)) {
-			err := gitMerge(config.BuildDir, pkg)
+func mergePkgBuilds(bases []Base) error {
+	for _, base := range bases {
+		if shouldUseGit(filepath.Join(config.BuildDir, base.Pkgbase())) {
+			err := gitMerge(config.BuildDir, base.Pkgbase())
 			if err != nil {
 				return err
 			}
@@ -815,21 +822,22 @@ func mergePkgBuilds(pkgs []string) error {
 	return nil
 }
 
-func downloadPkgBuilds(pkgs []string, bases map[string][]*rpc.Pkg, toSkip stringSet) (stringSet, error) {
+func downloadPkgBuilds(bases []Base, toSkip stringSet) (stringSet, error) {
 	cloned := make(stringSet)
 	downloaded := 0
 	var wg sync.WaitGroup
 	var mux sync.Mutex
 	var errs MultiError
 
-	download := func(k int, pkg string) {
+	download := func(k int, base Base) {
 		defer wg.Done()
+		pkg := base.Pkgbase()
 
 		if toSkip.get(pkg) {
 			mux.Lock()
 			downloaded++
 			str := bold(cyan("::") + " PKGBUILD up to date, Skipping (%d/%d): %s\n")
-			fmt.Printf(str, downloaded, len(pkgs), cyan(formatPkgbase(bases[pkg])))
+			fmt.Printf(str, downloaded, len(bases), cyan(formatPkgbase(base)))
 			mux.Unlock()
 			return
 		}
@@ -846,7 +854,7 @@ func downloadPkgBuilds(pkgs []string, bases map[string][]*rpc.Pkg, toSkip string
 				mux.Unlock()
 			}
 		} else {
-			err := downloadAndUnpack(baseURL+bases[pkg][0].URLPath, config.BuildDir)
+			err := downloadAndUnpack(baseURL+base.URLPath(), config.BuildDir)
 			if err != nil {
 				errs.Add(err)
 				return
@@ -856,13 +864,13 @@ func downloadPkgBuilds(pkgs []string, bases map[string][]*rpc.Pkg, toSkip string
 		mux.Lock()
 		downloaded++
 		str := bold(cyan("::") + " Downloaded PKGBUILD (%d/%d): %s\n")
-		fmt.Printf(str, downloaded, len(pkgs), cyan(formatPkgbase(bases[pkg])))
+		fmt.Printf(str, downloaded, len(bases), cyan(formatPkgbase(base)))
 		mux.Unlock()
 	}
 
-	for k, pkg := range pkgs {
+	for k, base := range bases {
 		wg.Add(1)
-		go download(k, pkg)
+		go download(k, base)
 	}
 
 	wg.Wait()
@@ -870,8 +878,9 @@ func downloadPkgBuilds(pkgs []string, bases map[string][]*rpc.Pkg, toSkip string
 	return cloned, errs.Return()
 }
 
-func downloadPkgBuildsSources(pkgs []string, bases map[string][]*rpc.Pkg, incompatible stringSet) (err error) {
-	for _, pkg := range pkgs {
+func downloadPkgBuildsSources(bases []Base, incompatible stringSet) (err error) {
+	for _, base := range bases {
+		pkg := base.Pkgbase()
 		dir := filepath.Join(config.BuildDir, pkg)
 		args := []string{"--verifysource", "-Ccf"}
 
@@ -881,7 +890,7 @@ func downloadPkgBuildsSources(pkgs []string, bases map[string][]*rpc.Pkg, incomp
 
 		err = show(passToMakepkg(dir, args...))
 		if err != nil {
-			return fmt.Errorf("Error downloading sources: %s", cyan(formatPkgbase(bases[pkg])))
+			return fmt.Errorf("Error downloading sources: %s", cyan(formatPkgbase(base)))
 		}
 	}
 
@@ -889,7 +898,8 @@ func downloadPkgBuildsSources(pkgs []string, bases map[string][]*rpc.Pkg, incomp
 }
 
 func buildInstallPkgBuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc.Srcinfo, parser *arguments, incompatible stringSet, conflicts mapStringSet) error {
-	for _, pkg := range do.Aur {
+	for _, base := range do.REALBASES {
+		pkg := base.Pkgbase()
 		dir := filepath.Join(config.BuildDir, pkg)
 		built := true
 
@@ -904,7 +914,7 @@ func buildInstallPkgBuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc
 		//pkgver bump
 		err := show(passToMakepkg(dir, args...))
 		if err != nil {
-			return fmt.Errorf("Error making: %s", formatPkgbase(do.Bases[pkg]))
+			return fmt.Errorf("Error making: %s", formatPkgbase(base))
 		}
 
 		pkgdests, version, err := parsePackageList(dir)
@@ -913,11 +923,11 @@ func buildInstallPkgBuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc
 		}
 
 		isExplicit := false
-		for _, base := range do.Bases[pkg] {
-			isExplicit = isExplicit || dp.Explicit.get(base.Name)
+		for _, b := range base {
+			isExplicit = isExplicit || dp.Explicit.get(b.Name)
 		}
 		if config.ReBuild == "no" || (config.ReBuild == "yes" && isExplicit) {
-			for _, split := range do.Bases[pkg] {
+			for _, split := range base {
 				pkgdest, ok := pkgdests[split.Name]
 				if !ok {
 					return fmt.Errorf("Could not find PKGDEST for: %s", split.Name)
@@ -946,7 +956,7 @@ func buildInstallPkgBuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc
 
 			err := show(passToMakepkg(dir, args...))
 			if err != nil {
-				return fmt.Errorf("Error making: %s", formatPkgbase(do.Bases[pkg]))
+				return fmt.Errorf("Error making: %s", formatPkgbase(base))
 			}
 		}
 
@@ -971,7 +981,7 @@ func buildInstallPkgBuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc
 			cmdArgs.globals["ask"] = fmt.Sprint(uask)
 		} else {
 			conflict := false
-			for _, split := range do.Bases[pkg] {
+			for _, split := range base {
 				if _, ok := conflicts[split.Name]; ok {
 					conflict = true
 				}
@@ -998,7 +1008,7 @@ func buildInstallPkgBuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc
 		remoteNamesCache := sliceToStringSet(remoteNames)
 		localNamesCache := sliceToStringSet(localNames)
 
-		for _, split := range do.Bases[pkg] {
+		for _, split := range base {
 			pkgdest, ok := pkgdests[split.Name]
 			if !ok {
 				return fmt.Errorf("Could not find PKGDEST for: %s", split.Name)
@@ -1025,7 +1035,7 @@ func buildInstallPkgBuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc
 
 		var mux sync.Mutex
 		var wg sync.WaitGroup
-		for _, pkg := range do.Bases[pkg] {
+		for _, pkg := range base {
 			wg.Add(1)
 			go updateVCSData(pkg.Name, srcinfo.Source, &mux, &wg)
 		}
@@ -1049,12 +1059,12 @@ func buildInstallPkgBuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc
 	return nil
 }
 
-func clean(pkgs []string) {
-	for _, pkg := range pkgs {
-		dir := filepath.Join(config.BuildDir, pkg)
+func clean(bases []Base) {
+	for _, base := range bases {
+		dir := filepath.Join(config.BuildDir, base.Pkgbase())
 
 		fmt.Println(bold(green(arrow +
-			" CleanAfter enabled. Deleting " + pkg + " source folder.")))
+			" CleanAfter enabled. Deleting " + base.Pkgbase() + " source folder.")))
 		os.RemoveAll(dir)
 	}
 }

@@ -47,9 +47,9 @@ func createDevelDB() error {
 
 	bases := getBases(infoMap)
 
-	toSkip := pkgBuildsToSkip(baseNames, bases, sliceToStringSet(remoteNames))
-	downloadPkgBuilds(baseNames, bases, toSkip)
-	tryParsesrcinfosFile(baseNames, srcinfosStale, bases)
+	toSkip := pkgBuildsToSkip(bases, sliceToStringSet(remoteNames))
+	downloadPkgBuilds(bases, toSkip)
+	tryParsesrcinfosFile(bases, srcinfosStale)
 
 	for _, pkgbuild := range srcinfosStale {
 		for _, pkg := range pkgbuild.Packages {

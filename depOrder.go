@@ -5,11 +5,26 @@ import (
 	rpc "github.com/mikkeloscar/aur"
 )
 
+type Base []*rpc.Pkg
+
+func (b Base) Pkgbase() string {
+	return b[0].PackageBase
+}
+
+func (b Base) Version() string {
+	return b[0].Version
+}
+
+func (b Base) URLPath() string {
+	return b[0].URLPath
+}
+
 type depOrder struct {
-	Aur     []string
-	Repo    []*alpm.Package
-	Runtime stringSet
-	Bases   map[string][]*rpc.Pkg
+	Aur       []string
+	Repo      []*alpm.Package
+	Runtime   stringSet
+	Bases     map[string][]*rpc.Pkg
+	REALBASES []Base
 }
 
 func makeDepOrder() *depOrder {
@@ -18,6 +33,7 @@ func makeDepOrder() *depOrder {
 		make([]*alpm.Package, 0),
 		make(stringSet),
 		make(map[string][]*rpc.Pkg),
+		make([]Base, 0),
 	}
 }
 
@@ -40,6 +56,10 @@ func getDepOrder(dp *depPool) *depOrder {
 		if repoPkg != nil {
 			do.orderPkgRepo(repoPkg, dp, true)
 		}
+	}
+
+	for _, pkg := range do.Aur {
+		do.REALBASES = append(do.REALBASES, do.Bases[pkg])
 	}
 
 	return do
@@ -99,7 +119,7 @@ func (do *depOrder) HasMake() bool {
 }
 
 func (do *depOrder) getMake() []string {
-	makeOnly := make([]string, 0, len(do.Aur)+len(do.Repo)-len(do.Runtime))
+	makeOnly := make([]string, 0, len(do.Bases)+len(do.Repo)-len(do.Runtime))
 
 	for _, base := range do.Bases {
 		for _, pkg := range base {
