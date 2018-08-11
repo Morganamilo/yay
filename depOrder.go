@@ -22,7 +22,7 @@ func (b Base) URLPath() string {
 type depOrder struct {
 	Repo      []*alpm.Package
 	Runtime   stringSet
-	REALBASES []Base
+	Aur []Base
 }
 
 func makeDepOrder() *depOrder {
@@ -56,7 +56,7 @@ func getDepOrder(dp *depPool) *depOrder {
 	}
 
 	for _, base := range basesMap {
-		do.REALBASES = append(do.REALBASES, base)
+		do.Aur = append(do.Aur, base)
 	}
 
 	return do
@@ -105,7 +105,7 @@ func (do *depOrder) orderPkgRepo(pkg *alpm.Package, dp *depPool, runtime bool) {
 
 func (do *depOrder) HasMake() bool {
 	lenAur := 0
-	for _, base := range do.REALBASES {
+	for _, base := range do.Aur {
 		lenAur += len(base)
 	}
 
@@ -113,9 +113,9 @@ func (do *depOrder) HasMake() bool {
 }
 
 func (do *depOrder) getMake() []string {
-	makeOnly := make([]string, 0, len(do.REALBASES)+len(do.Repo)-len(do.Runtime))
+	makeOnly := make([]string, 0, len(do.Aur)+len(do.Repo)-len(do.Runtime))
 
-	for _, base := range do.REALBASES {
+	for _, base := range do.Aur {
 		for _, pkg := range base {
 			if !do.Runtime.get(pkg.Name) {
 				makeOnly = append(makeOnly, pkg.Name)

@@ -211,7 +211,7 @@ func (do *depOrder) Print() {
 		}
 	}
 
-	for _, base := range do.REALBASES {
+	for _, base := range do.Aur {
 		pkg := base.Pkgbase()
 		pkgStr := "  " + pkg + "-" + base[0].Version
 		pkgStrMake := pkgStr

@@ -156,7 +156,7 @@ func install(parser *arguments) error {
 		arguments.addTarget(pkg)
 	}
 
-	if len(do.REALBASES) == 0 && len(arguments.targets) == 0 && (!parser.existsArg("u", "sysupgrade") || mode == ModeAUR) {
+	if len(do.Aur) == 0 && len(arguments.targets) == 0 && (!parser.existsArg("u", "sysupgrade") || mode == ModeAUR) {
 		fmt.Println(" there is nothing to do")
 		return nil
 	}
@@ -175,8 +175,8 @@ func install(parser *arguments) error {
 	}
 
 	if config.CleanMenu {
-		askClean := pkgbuildNumberMenu(do.REALBASES, remoteNamesCache)
-		toClean, err := cleanNumberMenu(do.REALBASES, remoteNamesCache, askClean)
+		askClean := pkgbuildNumberMenu(do.Aur, remoteNamesCache)
+		toClean, err := cleanNumberMenu(do.Aur, remoteNamesCache, askClean)
 		if err != nil {
 			return err
 		}
@@ -184,8 +184,8 @@ func install(parser *arguments) error {
 		cleanBuilds(toClean)
 	}
 
-	toSkip := pkgBuildsToSkip(do.REALBASES, targets)
-	cloned, err := downloadPkgBuilds(do.REALBASES, toSkip)
+	toSkip := pkgBuildsToSkip(do.Aur, targets)
+	cloned, err := downloadPkgBuilds(do.Aur, toSkip)
 	if err != nil {
 		return err
 	}
@@ -194,8 +194,8 @@ func install(parser *arguments) error {
 	var toEdit []Base
 
 	if config.DiffMenu {
-		pkgbuildNumberMenu(do.REALBASES, remoteNamesCache)
-		toDiff, err = diffNumberMenu(do.REALBASES, remoteNamesCache)
+		pkgbuildNumberMenu(do.Aur, remoteNamesCache)
+		toDiff, err = diffNumberMenu(do.Aur, remoteNamesCache)
 		if err != nil {
 			return err
 		}
@@ -218,20 +218,20 @@ func install(parser *arguments) error {
 		config.NoConfirm = oldValue
 	}
 
-	err = mergePkgBuilds(do.REALBASES)
+	err = mergePkgBuilds(do.Aur)
 	if err != nil {
 		return err
 	}
 
 	//initial srcinfo parse before pkgver() bump
-	err = parseSRCINFOFiles(do.REALBASES, srcinfosStale)
+	err = parseSRCINFOFiles(do.Aur, srcinfosStale)
 	if err != nil {
 		return err
 	}
 
 	if config.EditMenu {
-		pkgbuildNumberMenu(do.REALBASES, remoteNamesCache)
-		toEdit, err = editNumberMenu(do.REALBASES, remoteNamesCache)
+		pkgbuildNumberMenu(do.Aur, remoteNamesCache)
+		toEdit, err = editNumberMenu(do.Aur, remoteNamesCache)
 		if err != nil {
 			return err
 		}
@@ -255,13 +255,13 @@ func install(parser *arguments) error {
 	}
 
 	//TODO: fix for split packages maybe?
-	incompatible, err = getIncompatible(do.REALBASES, srcinfosStale)
+	incompatible, err = getIncompatible(do.Aur, srcinfosStale)
 	if err != nil {
 		return err
 	}
 
 	if config.PGPFetch {
-		err = checkPgpKeys(do.REALBASES, srcinfosStale)
+		err = checkPgpKeys(do.Aur, srcinfosStale)
 		if err != nil {
 			return err
 		}
@@ -312,7 +312,7 @@ func install(parser *arguments) error {
 
 	go updateCompletion(false)
 
-	err = downloadPkgBuildsSources(do.REALBASES, incompatible)
+	err = downloadPkgBuildsSources(do.Aur, incompatible)
 	if err != nil {
 		return err
 	}
@@ -341,7 +341,7 @@ func install(parser *arguments) error {
 	}
 
 	if config.CleanAfter {
-		clean(do.REALBASES)
+		clean(do.Aur)
 	}
 
 	return nil
@@ -898,7 +898,7 @@ func downloadPkgBuildsSources(bases []Base, incompatible stringSet) (err error) 
 }
 
 func buildInstallPkgBuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc.Srcinfo, parser *arguments, incompatible stringSet, conflicts mapStringSet) error {
-	for _, base := range do.REALBASES {
+	for _, base := range do.Aur {
 		pkg := base.Pkgbase()
 		dir := filepath.Join(config.BuildDir, pkg)
 		built := true
