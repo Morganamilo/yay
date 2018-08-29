@@ -44,13 +44,15 @@ makepkg -si
 
 ## Support
 
-All support related to Yay should be done via GitHub issues. Yay is not
-officially supported by Arch Linux and support should not be sought out on the
+All support related to Yay should be requested via GitHub issues. Since Yay is not
+officially supported by Arch Linux, support should not be sought out on the
 forums, AUR comments or other official channels.
 
-Broken AUR packages should be reported to the package's comments. Reports
-should only be made once confirming they are unable to be built with makepkg.
-Reports should be based around makepkg and make no mention of yay.
+A broken AUR package should be reported as a comment on the package's AUR page.
+A package may only be conidered broken if it fails to build with makepkg.
+Reports should be made using makepkg and include the full output as well as any
+other relevant information. Never make reports using Yay or any other external
+tools.
 
 ## Contributing
 
