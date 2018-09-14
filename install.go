@@ -27,7 +27,7 @@ func install(parser *arguments) error {
 	warnings := &aurWarnings{}
 	removeMake := false
 
-	if mode == ModeAny || mode == ModeRepo {
+	if mode == modeAny || mode == modeRepo {
 		if config.CombinedUpgrade {
 			if parser.existsArg("y", "refresh") {
 				err = earlyRefresh(parser)
@@ -67,7 +67,7 @@ func install(parser *arguments) error {
 	arguments.op = "S"
 	arguments.clearTargets()
 
-	if mode == ModeAUR {
+	if mode == modeAUR {
 		arguments.delArg("u", "sysupgrade")
 	}
 
@@ -156,7 +156,7 @@ func install(parser *arguments) error {
 		arguments.addTarget(pkg)
 	}
 
-	if len(do.Aur) == 0 && len(arguments.targets) == 0 && (!parser.existsArg("u", "sysupgrade") || mode == ModeAUR) {
+	if len(do.Aur) == 0 && len(arguments.targets) == 0 && (!parser.existsArg("u", "sysupgrade") || mode == modeAUR) {
 		fmt.Println(" there is nothing to do")
 		return nil
 	}
@@ -381,7 +381,7 @@ func earlyPacmanCall(parser *arguments) error {
 		return err
 	}
 
-	if mode == ModeRepo {
+	if mode == modeRepo {
 		arguments.targets = targets
 	} else {
 		alpmHandle.SetQuestionCallback(func(alpm.QuestionAny) {})

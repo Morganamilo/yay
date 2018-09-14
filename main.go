@@ -206,7 +206,7 @@ func main() {
 	}
 
 	exitOnError(setPaths())
-	config.defaultSettings()
+	config = defaultSettings()
 	exitOnError(initHomeDirs())
 	exitOnError(initConfig())
 	exitOnError(cmdArgs.parseCommandLine())
