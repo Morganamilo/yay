@@ -49,7 +49,7 @@ func questionCallback(question alpm.QuestionAny) {
 	for {
 		fmt.Print("\nEnter a number (default=1): ")
 
-		if config.NoConfirm {
+		if config.noConfirm {
 			fmt.Println()
 			break
 		}

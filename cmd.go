@@ -133,7 +133,7 @@ func handleCmd() (err error) {
 		return
 	}
 
-	if config.SudoLoop && cmdArgs.needRoot() {
+	if config.boolean["SudoLoop"] && cmdArgs.needRoot() {
 		sudoLoopBackground()
 	}
 
@@ -191,7 +191,8 @@ func handleVersion() {
 func handlePrint() (err error) {
 	switch {
 	case cmdArgs.existsArg("d", "defaultconfig"):
-		tmpConfig := defaultSettings()
+		var tmpConfig yayConfig
+		tmpConfig.defaultSettings()
 		tmpConfig.expandEnv()
 		fmt.Printf("%v", tmpConfig)
 	case cmdArgs.existsArg("g", "currentconfig"):
@@ -236,7 +237,7 @@ func handleGetpkgbuild() error {
 }
 
 func handleYogurt() error {
-	config.SearchMode = numberMenu
+	config.searchMode = numberMenu
 	return displayNumberMenu(cmdArgs.targets)
 }
 
@@ -245,9 +246,9 @@ func handleSync() error {
 
 	if cmdArgs.existsArg("s", "search") {
 		if cmdArgs.existsArg("q", "quiet") {
-			config.SearchMode = minimal
+			config.searchMode = minimal
 		} else {
-			config.SearchMode = detailed
+			config.searchMode = detailed
 		}
 		return syncSearch(targets)
 	}
@@ -310,7 +311,7 @@ func displayNumberMenu(pkgS []string) (err error) {
 		return fmt.Errorf("No packages match search")
 	}
 
-	if config.SortMode == bottomUp {
+	if config.num["SortMode"] == bottomUp {
 		if mode == modeAUR || mode == modeAny {
 			aq.printSearch(lenpq + 1)
 		}
@@ -351,7 +352,7 @@ func displayNumberMenu(pkgS []string) (err error) {
 
 	for i, pkg := range pq {
 		target := len(pq) - i
-		if config.SortMode == topDown {
+		if config.num["SortMode"] == topDown {
 			target = i + 1
 		}
 
@@ -362,7 +363,7 @@ func displayNumberMenu(pkgS []string) (err error) {
 
 	for i, pkg := range aq {
 		target := len(aq) - i + len(pq)
-		if config.SortMode == topDown {
+		if config.num["SortMode"] == topDown {
 			target = i + 1 + len(pq)
 		}
 
@@ -376,7 +377,7 @@ func displayNumberMenu(pkgS []string) (err error) {
 		return nil
 	}
 
-	if config.SudoLoop {
+	if config.boolean["SudoLoop"] {
 		sudoLoopBackground()
 	}
 
