@@ -233,7 +233,7 @@ func (dp *depPool) cacheAURPackages(_pkgs stringSet) error {
 		return nil
 	}
 
-	if config.boolean["Provides"] {
+	if config.boolean["provides"] {
 		err := dp.findProvides(pkgs)
 		if err != nil {
 			return err

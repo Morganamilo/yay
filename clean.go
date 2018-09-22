@@ -84,7 +84,7 @@ func syncClean(parser *arguments) error {
 		question = "Do you want to remove all other AUR packages from cache?"
 	}
 
-	fmt.Printf("\nBuild directory: %s\n", config.value["BuildDir"])
+	fmt.Printf("\nBuild directory: %s\n", config.value["builddir"])
 
 	if continueTask(question, true) {
 		err = cleanAUR(keepInstalled, keepCurrent, removeAll)
@@ -112,7 +112,7 @@ func cleanAUR(keepInstalled, keepCurrent, removeAll bool) error {
 		return err
 	}
 
-	files, err := ioutil.ReadDir(config.value["BuildDir"])
+	files, err := ioutil.ReadDir(config.value["builddir"])
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func cleanAUR(keepInstalled, keepCurrent, removeAll bool) error {
 			}
 		}
 
-		err = os.RemoveAll(filepath.Join(config.value["BuildDir"], file.Name()))
+		err = os.RemoveAll(filepath.Join(config.value["builddir"], file.Name()))
 		if err != nil {
 			return nil
 		}
@@ -176,7 +176,7 @@ func cleanAUR(keepInstalled, keepCurrent, removeAll bool) error {
 func cleanUntracked() error {
 	fmt.Println("removing Untracked AUR files from cache...")
 
-	files, err := ioutil.ReadDir(config.value["BuildDir"])
+	files, err := ioutil.ReadDir(config.value["builddir"])
 	if err != nil {
 		return err
 	}
@@ -186,7 +186,7 @@ func cleanUntracked() error {
 			continue
 		}
 
-		dir := filepath.Join(config.value["BuildDir"], file.Name())
+		dir := filepath.Join(config.value["builddir"], file.Name())
 
 		if shouldUseGit(dir) {
 			if err = show(passToGit(dir, "clean", "-fx")); err != nil {
