@@ -81,7 +81,7 @@ Permanent configuration options:
 
     --afterclean          Remove package sources after successful install
     --noafterclean        Do not remove package sources after successful build
-    --"bottomup"            Shows AUR's packages first and then repository's
+    --bottomup            Shows AUR's packages first and then repository's
     --topdown             Shows repository's packages first and then AUR's
 
     --devel               Check development packages during sysupgrade
