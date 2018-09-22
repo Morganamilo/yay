@@ -80,7 +80,7 @@ Permanent configuration options:
 
     --afterclean          Remove package sources after successful install
     --noafterclean        Do not remove package sources after successful build
-    --bottomup            Shows AUR's packages first and then repository's
+    --"bottomup"            Shows AUR's packages first and then repository's
     --topdown             Shows repository's packages first and then AUR's
 
     --devel               Check development packages during sysupgrade
@@ -295,11 +295,11 @@ func displayNumberMenu(pkgS []string) (err error) {
 
 	pkgS = removeInvalidTargets(pkgS)
 
-	if mode == modeAUR || mode == modeAny {
+	if config.mode == modeAUR || config.mode == modeAny {
 		aq, aurErr = narrowSearch(pkgS, true)
 		lenaq = len(aq)
 	}
-	if mode == modeRepo || mode == modeAny {
+	if config.mode == modeRepo || config.mode == modeAny {
 		pq, repoErr = queryRepo(pkgS)
 		lenpq = len(pq)
 		if repoErr != nil {
@@ -311,18 +311,18 @@ func displayNumberMenu(pkgS []string) (err error) {
 		return fmt.Errorf("No packages match search")
 	}
 
-	if config.num["SortMode"] == bottomUp {
-		if mode == modeAUR || mode == modeAny {
+	if config.value["SortMode"] == "bottomup" {
+		if config.mode == modeAUR || config.mode == modeAny {
 			aq.printSearch(lenpq + 1)
 		}
-		if mode == modeRepo || mode == modeAny {
+		if config.mode == modeRepo || config.mode == modeAny {
 			pq.printSearch()
 		}
 	} else {
-		if mode == modeRepo || mode == modeAny {
+		if config.mode == modeRepo || config.mode == modeAny {
 			pq.printSearch()
 		}
-		if mode == modeAUR || mode == modeAny {
+		if config.mode == modeAUR || config.mode == modeAny {
 			aq.printSearch(lenpq + 1)
 		}
 	}
@@ -352,7 +352,7 @@ func displayNumberMenu(pkgS []string) (err error) {
 
 	for i, pkg := range pq {
 		target := len(pq) - i
-		if config.num["SortMode"] == topDown {
+		if config.value["SortMode"] == "topdown" {
 			target = i + 1
 		}
 
@@ -363,7 +363,7 @@ func displayNumberMenu(pkgS []string) (err error) {
 
 	for i, pkg := range aq {
 		target := len(aq) - i + len(pq)
-		if config.num["SortMode"] == topDown {
+		if config.value["SortMode"] == "topdown" {
 			target = i + 1 + len(pq)
 		}
 

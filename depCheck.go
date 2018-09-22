@@ -165,7 +165,7 @@ func (dp *depPool) CheckConflicts() (mapStringSet, error) {
 		fmt.Println()
 		fmt.Println(bold(red(arrow)), bold("Package conflicts found:"))
 
-		if !config.UseAsk {
+		if !config.boolean["UseAsk"] {
 			fmt.Println(bold(red(arrow)), bold("You will have to confirm these when installing"))
 		}
 
@@ -181,7 +181,7 @@ func (dp *depPool) CheckConflicts() (mapStringSet, error) {
 
 		fmt.Println()
 
-		if config.NoConfirm && !config.UseAsk {
+		if config.noConfirm && !config.boolean["UseAsk"] {
 			return nil, fmt.Errorf("Package conflicts can not be resolved with noconfirm, aborting")
 		}
 	}

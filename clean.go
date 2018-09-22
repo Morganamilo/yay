@@ -67,13 +67,13 @@ func syncClean(parser *arguments) error {
 		}
 	}
 
-	if mode == modeRepo || mode == modeAny {
+	if config.mode == modeRepo || config.mode == modeAny {
 		if err = show(passToPacman(parser)); err != nil {
 			return err
 		}
 	}
 
-	if !(mode == modeAUR || mode == modeAny) {
+	if !(config.mode == modeAUR || config.mode == modeAny) {
 		return nil
 	}
 

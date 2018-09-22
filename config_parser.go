@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
+	"strconv"
 
 	"github.com/Morganamilo/go-pacmanconf/ini"
 )
@@ -20,6 +20,8 @@ func parseCallback(fileName string, line int, section string,
 
 	if section == "options" {
 		err = config.setOption(key, value)
+	} else if section == "intoptions" {
+		err = config.setIntOption(key, value)
 	} else if section == "menus" {
 		err = config.setMenus(key, value)
 	} else if section == "answer" {
@@ -52,21 +54,27 @@ func (y *yayConfig) setAnswer(key string, value string) error {
 }
 
 func (y *yayConfig) setOption(key string, value string) error {
-	switch key {
-	case "BottomUp":
-		y.num["SortMode"] = bottomUp
-	case "TopDown":
-		y.num["SortMode"] = topDown
+	if _, ok := y.boolean[key]; ok {
+		y.boolean[key] = true
 	}
 
 	y.value[key] = value
 	return nil
 }
 
-func initConfigv2() error {
+func (y *yayConfig) setIntOption(key string, value string) error {
+	tmp, err := strconv.Atoi(value)
+	if err == nil {
+		y.num[key] = tmp
+	}
+	return nil
+}
+
+func initConfig() error {
 	iniBytes, err := ioutil.ReadFile(config.file)
-	if !os.IsNotExist(err) || err != nil {
-		return fmt.Errorf("Failed to open config file '%s': %s", config.file, err)
+
+	if err != nil {
+		return fmt.Errorf("Failed to open config file '%s': %v", config.file, err)
 	}
 
 	// Toggle all switches false

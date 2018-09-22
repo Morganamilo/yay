@@ -19,18 +19,14 @@ const (
 	detailed
 	minimal
 
-	// Describes Sorting method for numberdisplay
-	bottomUp = iota
-	topDown
-
 	modeAUR targetMode = iota
 	modeRepo
 	modeAny
 )
 
 const (
-	configFileName string = "config.json" // configFileName holds the name of the config file.
-	vcsFileName    string = "vcs.json"    // vcsFileName holds the name of the vcs file.
+	configFileName string = "yay.conf" // configFileName holds the name of the config file.
+	vcsFileName    string = "vcs.json" // vcsFileName holds the name of the vcs file.
 )
 
 type targetMode int
@@ -41,15 +37,16 @@ type yayConfig struct {
 	value   map[string]string
 	boolean map[string]bool
 	// Loaded in Runtime
+	home             string  // home handles config directory home
 	file             string  // file holds yay config file path.
 	useColor         bool    // useColor enables/disables colored printing
-	configHome       string  // configHome handles config directory home
 	cacheHome        string  // cacheHome handles cache home
 	savedInfo        vcsInfo // savedInfo holds the current vcs info
 	vcsFile          string  // vcsfile holds yay vcs info file path.
 	shouldSaveConfig bool    // shouldSaveConfig holds whether or not the config should be saved
 	searchMode       int     // searchMode controls the print method of the query
 	noConfirm        bool
+	mode             targetMode // Mode is used to restrict yay to AUR or repo only modes
 }
 
 var config yayConfig
@@ -62,57 +59,55 @@ var pacmanConf *pacmanconf.Config
 // AlpmHandle is the alpm handle used by yay.
 var alpmHandle *alpm.Handle
 
-// Mode is used to restrict yay to AUR or repo only modes
-var mode = modeAny
-
 func (y *yayConfig) defaultSettings() {
 	y.noConfirm = false
+	y.mode = modeAny
 
 	y.boolean = map[string]bool{
 		"CleanAfter":      false,
-		"Devel":           false,
-		"GitClone":        true,
-		"Provides":        true,
 		"CleanMenu":       true,
-		"UpgradeMenu":     true,
+		"CombinedUpgrade": false,
+		"Devel":           false,
 		"DiffMenu":        true,
 		"EditMenu":        false,
-		"UseAsk":          false,
-		"CombinedUpgrade": false,
+		"GitClone":        true,
 		"PGPFetch":        true,
-		"TimeUpdate":      false,
+		"Provides":        true,
 		"SudoLoop":        false,
+		"TimeUpdate":      false,
+		"UpgradeMenu":     true,
+		"UseAsk":          false,
 	}
 
 	y.num = map[string]int{
 		"CompletionInterval": 7,
 		"RequestSplitN":      150,
-		"SortMode":           bottomUp,
 	}
 
 	y.value = map[string]string{
 		"AURURL":         "https://aur.archlinux.org",
-		"BuildDir":       "$HOME/.cache/yay",
-		"Editor":         "",
-		"EditorFlags":    "",
-		"MakepkgCommand": "makepkg",
-		"MakepkgConf":    "",
-		"PacmanCommand":  "pacman",
-		"PacmanConf":     "/etc/pacman.conf",
-		"GpgFlags":       "",
-		"MFlags":         "",
-		"GitFlags":       "",
-		"SortBy":         "votes",
-		"TarCommand":     "bsdtar",
-		"GitCommand":     "git",
-		"GPGCommand":     "gpg",
-		"ReDownload":     "no",
-		"ReBuild":        "no",
 		"AnswerClean":    "",
 		"AnswerDiff":     "",
 		"AnswerEdit":     "",
 		"AnswerUpgrade":  "",
+		"BuildDir":       "$HOME/.cache/yay",
+		"Editor":         "",
+		"EditorFlags":    "",
+		"GPGCommand":     "gpg",
+		"GPGFlags":       "",
+		"GitCommand":     "git",
+		"GitFlags":       "",
+		"MakepkgCommand": "makepkg",
+		"MakepkgConf":    "",
+		"MakepkgFlags":   "",
+		"PacmanCommand":  "pacman",
+		"PacmanConf":     "/etc/pacman.conf",
+		"Redownload":     "no",
+		"Rebuild":        "no",
 		"RemoveMake":     "ask",
+		"SortBy":         "votes",
+		"SortMode":       "bottomup",
+		"TarCommand":     "bsdtar",
 	}
 
 	if os.Getenv("XDG_CACHE_HOME") != "" {

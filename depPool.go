@@ -103,7 +103,7 @@ func (dp *depPool) ResolveTargets(pkgs []string) error {
 		var singleDb *alpm.Db
 
 		// aur/ prefix means we only check the aur
-		if target.Db == "aur" || mode == modeAUR {
+		if target.Db == "aur" || config.mode == modeAUR {
 			dp.Targets = append(dp.Targets, target)
 			aurTargets.set(target.DepString())
 			continue
@@ -153,7 +153,7 @@ func (dp *depPool) ResolveTargets(pkgs []string) error {
 		dp.Targets = append(dp.Targets, target)
 	}
 
-	if len(aurTargets) > 0 && (mode == modeAny || mode == modeAUR) {
+	if len(aurTargets) > 0 && (config.mode == modeAny || config.mode == modeAUR) {
 		return dp.resolveAURPackages(aurTargets, true)
 	}
 
@@ -233,7 +233,7 @@ func (dp *depPool) cacheAURPackages(_pkgs stringSet) error {
 		return nil
 	}
 
-	if config.Provides {
+	if config.boolean["Provides"] {
 		err := dp.findProvides(pkgs)
 		if err != nil {
 			return err
@@ -303,7 +303,7 @@ func (dp *depPool) resolveAURPackages(pkgs stringSet, explicit bool) error {
 
 		_, isInstalled := dp.LocalDb.PkgCache().FindSatisfier(dep) //has satisfier installed: skip
 		repoPkg, inRepos := dp.SyncDb.FindSatisfier(dep)           //has satisfier in repo: fetch it
-		if isInstalled == nil && (config.ReBuild != "tree" || inRepos == nil) {
+		if isInstalled == nil && (config.value["ReBuild"] != "tree" || inRepos == nil) {
 			continue
 		}
 

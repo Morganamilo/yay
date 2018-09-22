@@ -64,13 +64,13 @@ func (q aurQuery) printSearch(start int) {
 
 	for i, res := range q {
 		var toprint string
-		if config.SearchMode == numberMenu {
-			if config.SortMode == bottomUp {
+		if config.searchMode == numberMenu {
+			if config.value["SortMode"] == "bottomup" {
 				toprint += magenta(strconv.Itoa(len(q)+start-i-1) + " ")
 			} else {
 				toprint += magenta(strconv.Itoa(start+i) + " ")
 			}
-		} else if config.SearchMode == minimal {
+		} else if config.searchMode == minimal {
 			fmt.Println(res.Name)
 			continue
 		}
@@ -104,13 +104,13 @@ func (q aurQuery) printSearch(start int) {
 func (s repoQuery) printSearch() {
 	for i, res := range s {
 		var toprint string
-		if config.SearchMode == numberMenu {
-			if config.SortMode == bottomUp {
+		if config.searchMode == numberMenu {
+			if config.value["SortMode"] == "bottomup" {
 				toprint += magenta(strconv.Itoa(len(s)-i) + " ")
 			} else {
 				toprint += magenta(strconv.Itoa(i+1) + " ")
 			}
-		} else if config.SearchMode == minimal {
+		} else if config.searchMode == minimal {
 			fmt.Println(res.Name())
 			continue
 		}
@@ -285,7 +285,7 @@ func PrintInfo(a *rpc.Pkg) {
 	printInfoValue("Version", a.Version)
 	printInfoValue("Description", a.Description)
 	printInfoValue("URL", a.URL)
-	printInfoValue("AUR URL", config.AURURL+"/packages/"+a.Name)
+	printInfoValue("AUR URL", config.value["AURURL"]+"/packages/"+a.Name)
 	printInfoValue("Groups", strings.Join(a.Groups, "  "))
 	printInfoValue("Licenses", strings.Join(a.License, "  "))
 	printInfoValue("Provides", strings.Join(a.Provides, "  "))
@@ -310,7 +310,7 @@ func PrintInfo(a *rpc.Pkg) {
 		printInfoValue("ID", fmt.Sprintf("%d", a.ID))
 		printInfoValue("Package Base ID", fmt.Sprintf("%d", a.PackageBaseID))
 		printInfoValue("Package Base", a.PackageBase)
-		printInfoValue("Snapshot URL", config.AURURL+a.URLPath)
+		printInfoValue("Snapshot URL", config.value["AURURL"]+a.URLPath)
 	}
 
 	fmt.Println()
@@ -514,7 +514,7 @@ func printNewsFeed() error {
 		return err
 	}
 
-	if config.SortMode == bottomUp {
+	if config.value["SortMode"] == "bottomup" {
 		for i := len(rss.Channel.Items) - 1; i >= 0; i-- {
 			rss.Channel.Items[i].print(buildTime)
 		}
@@ -546,7 +546,7 @@ const (
 )
 
 func stylize(startCode, in string) string {
-	if useColor {
+	if config.useColor {
 		return startCode + in + resetCode
 	}
 
@@ -584,7 +584,7 @@ func bold(in string) string {
 // Colours text using a hashing algorithm. The same text will always produce the
 // same colour while different text will produce a different colour.
 func colourHash(name string) (output string) {
-	if !useColor {
+	if !config.useColor {
 		return name
 	}
 	var hash uint = 5381
@@ -613,7 +613,7 @@ func providerMenu(dep string, providers providers) *rpc.Pkg {
 	for {
 		fmt.Print("\nEnter a number (default=1): ")
 
-		if config.NoConfirm {
+		if config.noConfirm {
 			fmt.Println("1")
 			return providers.Pkgs[0]
 		}
