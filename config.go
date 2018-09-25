@@ -47,11 +47,12 @@ type yayConfig struct {
 	searchMode       int     // searchMode controls the print method of the query
 	noConfirm        bool
 	mode             targetMode // Mode is used to restrict yay to AUR or repo only modes
+	hideMenus        bool
 }
 
 var config yayConfig
 
-var version = "8.1115"
+var version = "8.1139"
 
 // AlpmConf holds the current config values for pacman.
 var pacmanConf *pacmanconf.Config
