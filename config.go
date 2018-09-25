@@ -63,6 +63,7 @@ var alpmHandle *alpm.Handle
 func (y *yayConfig) defaultSettings() {
 	y.noConfirm = false
 	y.mode = modeAny
+	y.hideMenus = false
 
 	y.boolean = map[string]bool{
 		"cleanafter":      false,
