@@ -168,7 +168,6 @@ func main() {
 	exitOnError(initConfig())
 	exitOnError(initHomeDirs())
 	exitOnError(cmdArgs.parseCommandLine())
-	config.expandEnv()
 	exitOnError(initbuilddir())
 	exitOnError(initVCS())
 	exitOnError(initAlpm())
