@@ -189,11 +189,44 @@ func cleanUntracked() error {
 		dir := filepath.Join(config.value["builddir"], file.Name())
 
 		if shouldUseGit(dir) {
-			if err = show(passToGit(dir, "clean", "-fx")); err != nil {
+			if err := show(passToGit(dir, "clean", "-fx")); err != nil {
 				return err
 			}
 		}
 	}
 
 	return nil
+}
+
+func cleanAfter(bases []Base) {
+	fmt.Println("removing Untracked AUR files from cache...")
+
+	for i, base := range bases {
+		dir := filepath.Join(config.value["builddir"], base.Pkgbase())
+
+		if shouldUseGit(dir) {
+			fmt.Printf(bold(cyan("::")+" Cleaning (%d/%d): %s\n"), i+1, len(bases), cyan(dir))
+			_, stderr, err := capture(passToGit(dir, "reset", "--hard", "HEAD"))
+			if err != nil {
+				fmt.Printf("error resetting %s: %s", base.String(), stderr)
+			}
+
+			show(passToGit(dir, "clean", "-fx"))
+		} else {
+			fmt.Printf(bold(cyan("::")+" Deleting (%d/%d): %s\n"), i+1, len(bases), cyan(dir))
+			if err := os.RemoveAll(dir); err != nil {
+				fmt.Println(err)
+			}
+		}
+	}
+}
+
+func cleanBuilds(bases []Base) {
+	for i, base := range bases {
+		dir := filepath.Join(config.value["builddir"], base.Pkgbase())
+		fmt.Printf(bold(cyan("::")+" Deleting (%d/%d): %s\n"), i+1, len(bases), cyan(dir))
+		if err := os.RemoveAll(dir); err != nil {
+			fmt.Println(err)
+		}
+	}
 }

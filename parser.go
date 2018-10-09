@@ -357,13 +357,13 @@ func isArg(arg string) bool {
 		"b", "dbpath", "c", "changelog", "d", "nodeps", "deps",
 		"e", "explicit", "f", "force", "g", "groups", "h", "help",
 		"i", "info", "k", "check", "l", "list", "m", "foreign",
-		"n", "native", "o", "owns", "p", "printformat", "q", "quiet",
+		"n", "native", "o", "owns", "p", "print", "print-format", "q", "quiet",
 		"r", "root", "s", "search", "t", "unrequired", "u", "upgrades",
 		"v", "verbose", "w", "downloadonly", "x", "regex", "y", "refresh",
 		//long options
 		"arch", "asdeps", "asexplicit", "assume-installed", "assumeinstalled",
 		"cachedir", "cascade", "clean", "color", "config", "confirm",
-		"dbonly", "debug", "disabledownloadtimeout", "file", "gpgdir",
+		"dbonly", "debug", "disable-download-timeout", "file", "gpgdir",
 		"hookdir", "ignore", "ignoregroup", "logfile", "machinereadable",
 		"needed", "noconfirm", "noprogressbar", "noscriptlet",
 		"overwrite", "recursive", "sysroot", "sysupgrade", "unneeded",
@@ -650,7 +650,7 @@ func (parser *arguments) extractYayOptions() {
 	config.value["aururl"] = strings.TrimRight(config.value["aururl"], "/")
 }
 
-//parses input for number menus splitted by spaces or commas
+//parses input for number menus split by spaces or commas
 //supports individual selection: 1 2 3 4
 //supports range selections: 1-4 10-20
 //supports negation: ^1 ^1-4

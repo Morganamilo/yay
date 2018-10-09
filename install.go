@@ -385,7 +385,7 @@ func earlyPacmanCall(parser *arguments) error {
 		arguments.targets = targets
 	} else {
 		alpmHandle.SetQuestionCallback(func(alpm.QuestionAny) {})
-		//seperate aur and repo targets
+		//separate aur and repo targets
 		for _, target := range targets {
 			if inRepos(syncDb, target) {
 				arguments.addTarget(target)
@@ -680,14 +680,6 @@ func editDiffNumberMenu(bases []Base, installed stringSet, diff bool) ([]Base, e
 	return toEdit, nil
 }
 
-func cleanBuilds(bases []Base) {
-	for i, base := range bases {
-		dir := filepath.Join(config.value["builddir"], base.Pkgbase())
-		fmt.Printf(bold(cyan("::")+" Deleting (%d/%d): %s\n"), i+1, len(bases), cyan(dir))
-		os.RemoveAll(dir)
-	}
-}
-
 func showPkgbuildDiffs(bases []Base, cloned stringSet) error {
 	for _, base := range bases {
 		pkg := base.Pkgbase()
@@ -962,12 +954,14 @@ func buildInstallPkgbuilds(dp *depPool, do *depOrder, srcinfos map[string]*gosrc
 			}
 
 			if installed {
+				show(passToMakepkg(dir, "-c", "--nobuild", "--noextract", "--ignorearch"))
 				fmt.Println(cyan(pkg+"-"+version) + bold(" is up to date -- skipping"))
 				continue
 			}
 		}
 
 		if built {
+			show(passToMakepkg(dir, "-c", "--nobuild", "--noextract", "--ignorearch"))
 			fmt.Println(bold(yellow(arrow)),
 				cyan(pkg+"-"+version)+bold(" already made -- skipping build"))
 		} else {
