@@ -366,7 +366,7 @@ func isArg(arg string) bool {
 		"dbonly", "debug", "disable-download-timeout", "file", "gpgdir",
 		"hookdir", "ignore", "ignoregroup", "logfile", "machinereadable",
 		"needed", "noconfirm", "noprogressbar", "noscriptlet",
-		"overwrite", "recursive", "sysroot", "sysupgrade", "unneeded",
+		"overwrite", "recursive", "sysroot", "sysupgrade", "unneeded", "ask",
 		//yay options
 		"a", "aur",
 		"repo",
