@@ -210,6 +210,11 @@ func main() {
 	exitOnError(setPaths())
 	config = defaultSettings()
 	exitOnError(initHomeDirs())
+
+	yayconf := &yayConfig{}
+	exitOnError(yayconf.initConfig())
+	fmt.Println(yayconf)
+
 	exitOnError(initConfig())
 	exitOnError(cmdArgs.parseCommandLine())
 	if shouldSaveConfig {
