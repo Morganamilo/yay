@@ -71,12 +71,7 @@ Yay depends on:
 * git
 * base-devel
 
-Note: Yay also depends on a few other projects (as vendored dependencies). These
-projects are stored in `vendor/`, are built into yay at build time, and do not
-need to be installed separately. These files are managed by
-[dep](https://github.com/golang/dep) and should not be modified manually.
-
-Following are the dependencies managed under dep:
+Following are the dependencies managed under go modules:
 
 * https://github.com/Jguer/go-alpm
 * https://github.com/Morganamilo/go-srcinfo
